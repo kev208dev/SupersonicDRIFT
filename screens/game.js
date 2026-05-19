@@ -17,7 +17,7 @@ import {
   updateFovPump,
 } from '../js/effects.js';
 import { scatterProps, updateScenery } from '../js/scenery.js';
-import { awardMissions } from '../utils/profile.js';
+import { awardMissions, recordTrackPlay } from '../utils/profile.js';
 import { CAR_DATA } from '../data/cars.js';
 
 // ── Three.js renderer (persists across retries) ──────────────
@@ -90,6 +90,11 @@ export function initGame(cd, tr, resultsCb, menuCb, options = {}) {
   lapPath = [];
   bestGhost = raceOptions.ghostEnabled ? getBestGhost(tr.id) : null;
   lapStats = _makeLapStats();
+  try {
+    recordTrackPlay(tr.id);
+  } catch (error) {
+    console.warn('Track play progress failed:', error);
+  }
   if (resultsTimeout) {
     clearTimeout(resultsTimeout);
     resultsTimeout = null;
@@ -220,7 +225,7 @@ export function updateGame(dt, now) {
   if (input.cameraToggle) {
     cameraMode = CAMERA_MODES[(CAMERA_MODES.indexOf(cameraMode) + 1) % CAMERA_MODES.length];
   }
-  if (input.reset)  _resetCar();
+  if (input.reset && raceReleased) _resetCar();
   if (input.escape) { stopGame(); if (onMenu) onMenu(); return; }
 
   startCountdown = Math.max(0, (startReadyAt - now) / 1000);

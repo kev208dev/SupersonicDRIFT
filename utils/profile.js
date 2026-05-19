@@ -144,15 +144,38 @@ export async function awardMissions(trackId, lapMs, context = {}) {
   return [...rewards, ...skinRewards];
 }
 
-export function awardSkinProgress(trackId, context = {}) {
-  if (!profile) return [];
+export function recordTrackPlay(trackId) {
+  if (!profile || !trackId) return [];
   const stats = profile.stats || {};
   const trackPlays = { ...(stats.track_plays || {}) };
   trackPlays[trackId] = Number(trackPlays[trackId] || 0) + 1;
+  const nextStats = { ...stats, track_plays: trackPlays };
+  const owned = new Set(profile.owned_skin_ids || DEFAULT_SKINS);
+  const gained = [];
 
+  for (const skin of SKIN_DATA) {
+    const unlock = skin.unlock || {};
+    if (owned.has(skin.id) || unlock.type !== 'trackPlays') continue;
+    if (Object.values(trackPlays).some(count => Number(count) >= Number(unlock.count || 0))) {
+      owned.add(skin.id);
+      gained.push({ id: `skin_${skin.id}`, name: `${skin.name} 획득`, reward: 0, skin });
+    }
+  }
+
+  profile = saveProfile({
+    ...profile,
+    stats: nextStats,
+    owned_skin_ids: [...owned],
+  });
+  notify();
+  return gained;
+}
+
+export function awardSkinProgress(trackId, context = {}) {
+  if (!profile) return [];
+  const stats = profile.stats || {};
   const nextStats = {
     ...stats,
-    track_plays: trackPlays,
     no_throttle_finishes: Number(stats.no_throttle_finishes || 0) + (context.noThrottle ? 1 : 0),
     finishes: Number(stats.finishes || 0) + 1,
   };
@@ -164,7 +187,6 @@ export function awardSkinProgress(trackId, context = {}) {
     const unlock = skin.unlock || {};
     const ok =
       unlock.type === 'noThrottleFinish' ? !!context.noThrottle :
-      unlock.type === 'trackPlays' ? Object.values(trackPlays).some(count => Number(count) >= Number(unlock.count || 0)) :
       unlock.type === 'trackFinish' ? unlock.trackId === trackId :
       false;
     if (ok) {
@@ -214,7 +236,9 @@ export function getSkinProgressText(skin) {
     return `${Number(stats.no_throttle_finishes || 0)}회 달성`;
   }
   if (unlock.type === 'rankOne') return '온라인 랭킹 1위 필요';
-  if (unlock.type === 'trackFinish') return `${unlock.trackId} 완주 필요`;
+  if (unlock.type === 'trackFinish') {
+    return `${unlock.trackId === 'aurora_endurance' ? 'Aurora Endurance' : unlock.trackId} 완주 필요`;
+  }
   return '조건을 달성하면 해금';
 }
 

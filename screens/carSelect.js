@@ -66,7 +66,7 @@ function _render() {
     card.appendChild(previewDiv);
     card.insertAdjacentHTML('beforeend', `
       <div class="car-name">${car.name}</div>
-      <span class="car-badge">${locked ? 'SHOP' : car.rarity || car.category}</span>
+      <span class="car-badge">${locked ? (Number(car.price || 0) <= 0 ? 'FREE' : 'SHOP') : car.rarity || car.category}</span>
       <div class="car-tags">
         <span>${car.driveType}</span>
         <span>${car.power} hp</span>

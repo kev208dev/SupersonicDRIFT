@@ -10,17 +10,17 @@ export const SKIN_DATA = [
   },
   {
     id: 'ori',
-    name: 'Ori Skin',
+    name: '오리 스킨',
     rarity: 'Event',
     color: '#ffd84a',
     accent: '#ff8a00',
     emissive: '#aa6600',
-    description: '한 맵을 앞으로 가는 키 없이 완주하면 열립니다.',
+    description: '오리처럼 노란 차체와 주황 포인트가 들어간 이벤트 스킨입니다.',
     unlock: { type: 'noThrottleFinish', text: 'W/위쪽 방향키 없이 아무 맵 완주' },
   },
   {
     id: 'dino',
-    name: 'Dino Skin',
+    name: '공룡 스킨',
     rarity: 'Event',
     color: '#4ade80',
     accent: '#facc15',
@@ -29,7 +29,7 @@ export const SKIN_DATA = [
   },
   {
     id: 'minecraft',
-    name: 'Minecraft Skin',
+    name: '마인크래프트 스킨',
     rarity: 'Event',
     color: '#6bbf59',
     accent: '#7a4a24',
@@ -38,7 +38,7 @@ export const SKIN_DATA = [
   },
   {
     id: 'flame',
-    name: 'Flame Skin',
+    name: '화염 스킨',
     rarity: 'Event',
     color: '#ff4a08',
     accent: '#ffd166',
