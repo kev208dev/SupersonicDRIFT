@@ -130,7 +130,13 @@ export function updateCar3D(mesh3d, car, input, track = null) {
   const surfaceY = _trackSurfaceHeight(track, car.x, car.y) + wallRideLift;
   car.roadHeight = surfaceY;
   mesh3d.position.set(car.x, surfaceY, -car.y);
-  mesh3d.rotation.y = car.angle;
+  if (mesh3d._visualAngle == null) mesh3d._visualAngle = car.angle;
+  let visualDelta = car.angle - mesh3d._visualAngle;
+  while (visualDelta > Math.PI) visualDelta -= Math.PI * 2;
+  while (visualDelta < -Math.PI) visualDelta += Math.PI * 2;
+  if (Math.abs(visualDelta) > Math.PI * 0.72) mesh3d._visualAngle = car.angle;
+  else mesh3d._visualAngle += visualDelta * 0.38;
+  mesh3d.rotation.y = mesh3d._visualAngle;
 
   const speedSign = Math.sign(car.vx * Math.cos(car.angle) + car.vy * Math.sin(car.angle)) || 1;
   const speed = car.speed;
@@ -232,15 +238,15 @@ export function updateCar3D(mesh3d, car, input, track = null) {
       const on = !!car.boosting || !!car.drsActive;
       c.visible = on;
       const power = Math.max(car.boostPower || 0, car.drsPower || 0);
-      const base = 2.45 * (car.flameScale || 1) * (0.50 + power * 0.95);
-      const flicker = 0.88 + Math.random() * 0.22;
-      c.scale.set(base * flicker, base * (0.92 + Math.random() * 0.12), base * (0.88 + Math.random() * 0.18));
+      const base = 1.58 * (car.flameScale || 1) * (0.46 + power * 0.82);
+      const flicker = 0.92 + Math.random() * 0.14;
+      c.scale.set(base * 0.62 * flicker, base * 0.58, base * (1.08 + Math.random() * 0.16));
       c.children.forEach(part => {
         if (!part.material) return;
         const inner = part.name === 'flameinner';
         const glow = part.name === 'flameglow';
         part.material.opacity = on
-          ? (inner ? 0.82 : glow ? 0.22 : 0.48) * (0.55 + power * 0.45)
+          ? (inner ? 0.68 : glow ? 0.13 : 0.36) * (0.55 + power * 0.45)
           : 0;
       });
     }

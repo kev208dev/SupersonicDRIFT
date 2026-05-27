@@ -18,6 +18,8 @@ const CLIENTS = new Set();
 const DATABASE_URL = process.env.DATABASE_URL;
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const RECORD_TIME_ADJUSTMENT_ID = 'add-13s-to-existing-records-2026-05-27';
+const RECORD_TIME_ADJUSTMENT_MS = 13000;
 let pgPool = null;
 let pgReady = false;
 let supabaseClient = null;
@@ -106,7 +108,7 @@ async function loadDb() {
 
   try {
     const raw = await readFile(DB_PATH, 'utf8');
-    const db = JSON.parse(raw);
+    const db = applyLocalRecordAdjustment(JSON.parse(raw));
     return { records: Array.isArray(db.records) ? db.records : [] };
   } catch {
     return { records: [] };
@@ -158,9 +160,52 @@ async function getPgPool() {
     `);
     await pgPool.query('ALTER TABLE leaderboard_records ENABLE ROW LEVEL SECURITY');
     await pgPool.query('REVOKE ALL ON TABLE leaderboard_records FROM anon, authenticated');
+    await applyPgRecordAdjustment();
     pgReady = true;
   }
   return pgPool;
+}
+
+async function applyPgRecordAdjustment() {
+  await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS app_migrations (
+      id TEXT PRIMARY KEY,
+      applied_at BIGINT NOT NULL
+    )
+  `);
+  const applied = await pgPool.query('SELECT id FROM app_migrations WHERE id = $1', [RECORD_TIME_ADJUSTMENT_ID]);
+  if (applied.rowCount > 0) return;
+  await pgPool.query('BEGIN');
+  try {
+    await pgPool.query('UPDATE leaderboard_records SET lap_ms = LEAST(1800000, lap_ms + $1), updated_at = $2', [
+      RECORD_TIME_ADJUSTMENT_MS,
+      Date.now(),
+    ]);
+    await pgPool.query('INSERT INTO app_migrations (id, applied_at) VALUES ($1, $2)', [
+      RECORD_TIME_ADJUSTMENT_ID,
+      Date.now(),
+    ]);
+    await pgPool.query('COMMIT');
+  } catch (error) {
+    await pgPool.query('ROLLBACK');
+    throw error;
+  }
+}
+
+function applyLocalRecordAdjustment(db) {
+  if (!db || typeof db !== 'object') return { records: [] };
+  const migrations = Array.isArray(db.migrations) ? db.migrations : [];
+  if (migrations.includes(RECORD_TIME_ADJUSTMENT_ID)) return db;
+  if (Array.isArray(db.records)) {
+    db.records = db.records.map(record => ({
+      ...record,
+      lapMs: Math.min(1800000, Number(record.lapMs || 0) + RECORD_TIME_ADJUSTMENT_MS),
+      updatedAt: Date.now(),
+    }));
+  }
+  db.migrations = [...migrations, RECORD_TIME_ADJUSTMENT_ID];
+  saveDb(db).catch(error => console.warn('Local record adjustment save failed:', error));
+  return db;
 }
 
 function rowToRecord(row) {

@@ -269,23 +269,27 @@ export function drawSpeedLines(ctx, lines, kmh, w, h, dt, cameraMode = 'chase') 
     return;
   }
   const intensity = Math.min(1, (kmh - 45) / 190);
-  const cx = w * 0.5, cy = h * 0.62;
+  const cx = w * 0.5, cy = h * 0.58;
   const speedScale = 1500 + intensity * 3200;
-  const spawnRate  = 110 + intensity * 260;
+  const spawnRate  = boostActiveRate(kmh) + intensity * 180;
 
   // Spawn fresh particles
   let toSpawn = spawnRate * dt;
   for (const p of lines) {
     if (p.life > 0) continue;
     if (toSpawn <= 0) break;
-    const a   = Math.random() * Math.PI * 2;
-    const r0  = 60 + Math.random() * 220;
-    p.x = cx + Math.cos(a) * r0;
-    p.y = cy + Math.sin(a) * r0;
-    p.vx = Math.cos(a) * speedScale;
-    p.vy = Math.sin(a) * speedScale;
-    p.len = 32 + Math.random() * 50;
-    p.alpha = 0.16 + Math.random() * 0.24;
+    const side = Math.floor(Math.random() * 4);
+    if (side === 0) { p.x = Math.random() * w; p.y = -20; }
+    else if (side === 1) { p.x = w + 20; p.y = Math.random() * h; }
+    else if (side === 2) { p.x = Math.random() * w; p.y = h + 20; }
+    else { p.x = -20; p.y = Math.random() * h; }
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const dl = Math.hypot(dx, dy) || 1;
+    p.vx = (dx / dl) * speedScale;
+    p.vy = (dy / dl) * speedScale;
+    p.len = 24 + Math.random() * 42;
+    p.alpha = 0.10 + Math.random() * 0.18;
     p.life  = 0.34;
     toSpawn -= 1;
   }
@@ -313,6 +317,10 @@ export function drawSpeedLines(ctx, lines, kmh, w, h, dt, cameraMode = 'chase') 
     ctx.stroke();
   }
   ctx.restore();
+}
+
+function boostActiveRate(kmh) {
+  return kmh > 180 ? 105 : 70;
 }
 
 // ── FOV pump (camera lerps from base FOV up to base+boost) ───────────
