@@ -310,7 +310,7 @@ export const TRACKS = [
       mostWinsDriver: 'Ayrton Senna',
       mostWinsCount: 6,
       iconicMomentTitle: '1996: Olivier Panis Wins in Chaos',
-      famousCorners: ['Casino Square', 'Grand Hotel Hairpin', 'Swimming Pool'],
+      famousCorners: ['Monte Carlo Square', 'Grand Hotel Hairpin', 'Swimming Pool'],
     },
     trace: [
       [290, 760], [340, 555], [510, 345], [750, 225], [1045, 205],

@@ -422,7 +422,7 @@ function _wireProfilePanel() {
   onAuthChange(_renderProfilePanel);
   onProfileChange(profile => {
     _renderProfilePanel();
-    if (profile && !profile.starter_claimed) _openStarterRoulette();
+    if (profile && !profile.starter_claimed) _openStarterRewardPack();
   });
 }
 
@@ -552,47 +552,47 @@ function _wireAuthScreen() {
   });
 }
 
-function _wireStarterRoulette() {
-  const spin = document.getElementById('btn-roulette-spin');
-  if (!spin) return;
-  spin.onclick = async () => {
+function _wireStarterRewardPack() {
+  const open = document.getElementById('btn-reward-pack-open');
+  if (!open) return;
+  open.onclick = async () => {
     const profile = getProfile();
-    if (!profile || profile.starter_claimed) return _closeStarterRoulette();
+    if (!profile || profile.starter_claimed) return _closeStarterRewardPack();
     const car = rollStarterCar();
-    const reels = [
-      document.getElementById('roulette-reel-1'),
-      document.getElementById('roulette-reel-2'),
-      document.getElementById('roulette-reel-3'),
+    const cards = [
+      document.getElementById('reward-card-1'),
+      document.getElementById('reward-card-2'),
+      document.getElementById('reward-card-3'),
     ];
-    const result = document.getElementById('roulette-result');
+    const result = document.getElementById('reward-pack-result');
     const names = CAR_DATA.map(item => item.name);
-    spin.disabled = true;
+    open.disabled = true;
     let ticks = 0;
     const interval = setInterval(() => {
       ticks++;
-      reels.forEach((reel, i) => {
-        if (reel) reel.textContent = names[(ticks + i * 3) % names.length];
+      cards.forEach((card, i) => {
+        if (card) card.textContent = names[(ticks + i * 3) % names.length];
       });
       if (ticks > 26) {
         clearInterval(interval);
-        reels.forEach(reel => { if (reel) reel.textContent = car.name; });
-        if (result) result.textContent = `JACKPOT! ${car.name} 획득`;
+        cards.forEach(card => { if (card) card.textContent = car.name; });
+        if (result) result.textContent = `Bonus car unlocked: ${car.name}`;
         claimStarterCar(car.id).finally(() => {
-          setTimeout(_closeStarterRoulette, 1200);
-          spin.disabled = false;
+          setTimeout(_closeStarterRewardPack, 1200);
+          open.disabled = false;
         });
       }
     }, 70);
   };
 }
 
-function _openStarterRoulette() {
-  const overlay = document.getElementById('starter-roulette-overlay');
+function _openStarterRewardPack() {
+  const overlay = document.getElementById('starter-reward-overlay');
   if (overlay) overlay.classList.remove('hidden');
 }
 
-function _closeStarterRoulette() {
-  const overlay = document.getElementById('starter-roulette-overlay');
+function _closeStarterRewardPack() {
+  const overlay = document.getElementById('starter-reward-overlay');
   if (overlay) overlay.classList.add('hidden');
 }
 
@@ -649,7 +649,7 @@ initAds();
 _wireMainMenu();
 _wireAuthScreen();
 _wireProfilePanel();
-_wireStarterRoulette();
+_wireStarterRewardPack();
 _wireHomeLeaderboard();
 _wireGlobalLeaderboard();
 _wireGlobalCompletionToast();
