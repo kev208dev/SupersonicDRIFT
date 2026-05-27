@@ -9,7 +9,10 @@ const PROFILES_KEY = 'racing_local_profiles';
 const DEFAULT_OWNED = ['apex_gt3', 'feather_sprint'];
 const DEFAULT_SKINS = ['factory', 'neon', 'classic'];
 const DEFAULT_THEME = '#2ec4b6';
-const SUPER_ACCOUNT_IDS = new Set(['admin', 'kev208', 'kev208dev']);
+const SUPER_ACCOUNT_IDS = new Set(['admin', 'kev208', 'kev208dev', 'tiger0208']);
+const SUPER_ACCOUNT_NICKNAMES = {
+  tiger0208: 'ㅈㅈㅈ',
+};
 const ACCOUNT_CAR_UNLOCKS = {
   ahgo: ['zero_f1'],
   'i-mtheking': ['zero_f1'],
@@ -286,16 +289,19 @@ function ensureProfile(user) {
     if (accountUnlocks.some(id => !normalized.owned_car_ids.includes(id))) {
       normalized = saveProfile({ ...normalized, owned_car_ids: unique([...normalized.owned_car_ids, ...accountUnlocks]) });
     }
-    if (isSuperAccount(user) && (
-      !ALL_CAR_IDS.every(id => normalized.owned_car_ids.includes(id)) ||
-      !ALL_SKIN_IDS.every(id => normalized.owned_skin_ids.includes(id))
-    )) {
-      normalized = saveProfile({ ...normalized, owned_car_ids: ALL_CAR_IDS, owned_skin_ids: ALL_SKIN_IDS, starter_claimed: true });
+    if (isSuperAccount(user)) {
+      normalized = saveProfile({
+        ...normalized,
+        nickname: getSuperNickname(user) || normalized.nickname,
+        owned_car_ids: ALL_CAR_IDS,
+        owned_skin_ids: ALL_SKIN_IDS,
+        starter_claimed: true,
+      });
     }
     return normalized;
   }
   const local = getPlayerProfile();
-  const nickname = safeNickname(local.name || user.id, user.id);
+  const nickname = getSuperNickname(user) || safeNickname(local.name || user.id, user.id);
   const fresh = {
     user_id: user.id,
     nickname,
@@ -325,7 +331,7 @@ function normalizeProfile(row, user = getCurrentUser()) {
   const accountUnlocks = accountUnlockIds({ id: userId });
   return {
     user_id: userId,
-    nickname: safeNickname(row.nickname, 'Driver'),
+    nickname: getSuperNickname({ id: userId }) || safeNickname(row.nickname, 'Driver'),
     theme_color: normalizeColor(row.theme_color) || DEFAULT_THEME,
     coins: Number(row.coins || 0),
     owned_car_ids: isSuperAccount({ id: userId }) ? ALL_CAR_IDS : unique([...owned, ...accountUnlocks]),
@@ -339,6 +345,11 @@ function normalizeProfile(row, user = getCurrentUser()) {
 function isSuperAccount(user = getCurrentUser()) {
   const id = String(user?.id || '').trim().toLowerCase();
   return SUPER_ACCOUNT_IDS.has(id);
+}
+
+function getSuperNickname(user = getCurrentUser()) {
+  const id = String(user?.id || '').trim().toLowerCase();
+  return SUPER_ACCOUNT_NICKNAMES[id] || null;
 }
 
 function accountUnlockIds(user = getCurrentUser()) {
