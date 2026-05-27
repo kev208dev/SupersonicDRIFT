@@ -132,12 +132,13 @@ export async function awardMissions(trackId, lapMs, context = {}) {
   const rewards = MISSIONS.filter(mission =>
     mission.trackId === trackId &&
     lapMs <= mission.lapMs &&
-    !completed.has(mission.id)
+    (isRepeatableMission(mission) || !completed.has(mission.id))
   );
   const skinRewards = awardSkinProgress(trackId, context);
   if (!rewards.length && !skinRewards.length) return [];
   const rewardCoins = rewards.reduce((sum, mission) => sum + mission.reward, 0);
-  const nextCompleted = unique([...(profile.completed_missions || []), ...rewards.map(m => m.id)]);
+  const oneTimeRewards = rewards.filter(mission => !isRepeatableMission(mission));
+  const nextCompleted = unique([...(profile.completed_missions || []), ...oneTimeRewards.map(m => m.id)]);
   profile = saveProfile({
     ...profile,
     coins: (profile.coins || 0) + rewardCoins,
@@ -355,6 +356,10 @@ function getSuperNickname(user = getCurrentUser()) {
 function accountUnlockIds(user = getCurrentUser()) {
   const id = String(user?.id || '').trim().toLowerCase();
   return ACCOUNT_CAR_UNLOCKS[id] || [];
+}
+
+function isRepeatableMission(mission) {
+  return String(mission?.id || '').includes('_finish_');
 }
 
 function normalizeColor(value) {
