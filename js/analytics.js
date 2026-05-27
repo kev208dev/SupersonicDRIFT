@@ -16,17 +16,19 @@ export function initAnalytics() {
     window.gtag('js', new Date());
     window.gtag('config', GA_MEASUREMENT_ID);
   }
+
+  if (CLARITY_ID) {
+    // Load Microsoft Clarity here when CLARITY_ID is configured.
+  }
 }
 
 export function trackEvent(eventName, params = {}) {
   if (!eventName) return;
+  if (!GA_MEASUREMENT_ID && !CLARITY_ID) return;
   if (typeof window.gtag === 'function') {
     window.gtag('event', eventName, params);
   }
   if (typeof window.clarity === 'function' && CLARITY_ID) {
     window.clarity('event', eventName);
-  }
-  if (!GA_MEASUREMENT_ID && !CLARITY_ID) {
-    console.debug('[analytics placeholder]', eventName, params);
   }
 }

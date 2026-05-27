@@ -5,7 +5,9 @@ export function initAds() {
 
 export function showBannerAd(slotId) {
   const slot = document.getElementById(slotId);
+  console.log('Banner ad placeholder:', slotId);
   if (!slot) return;
+  // Insert Google AdSense or another banner SDK render call here later.
   slot.classList.add('ad-placeholder');
   slot.setAttribute('aria-label', 'Advertisement');
   if (!slot.textContent.trim()) {
@@ -14,7 +16,7 @@ export function showBannerAd(slotId) {
 }
 
 export function showRewardedAd(onReward) {
+  // Insert rewarded ad SDK logic here later. For now, immediately resolve.
   console.log('Rewarded ad placeholder');
-  alert('Rewarded ad placeholder');
   if (typeof onReward === 'function') onReward();
 }

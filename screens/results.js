@@ -114,7 +114,10 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
   if (retryBtn) retryBtn.onclick = () => { cleanupLeaderboard(); if (retryCb) retryCb(); };
   if (menuBtn)  menuBtn.onclick  = () => { cleanupLeaderboard(); if (menuCb)  menuCb();  };
   if (leaderboardBtn) leaderboardBtn.onclick = () => document.getElementById('btn-open-leaderboard')?.click();
-  if (shareBtn) shareBtn.onclick = () => shareScore(score).catch(error => console.warn('share failed', error));
+  if (shareBtn) shareBtn.onclick = () => {
+    trackEvent('share_score', { score });
+    shareScore(score).catch(error => console.warn('share failed', error));
+  };
   if (rewardedBtn) rewardedBtn.onclick = () => {
     trackEvent('rewarded_ad_click', { placement: 'game_over' });
     showRewardedAd(() => console.log('Reward callback placeholder'));
