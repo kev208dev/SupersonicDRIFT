@@ -421,8 +421,12 @@
             <div class="lobby-room-meta">
               <span id="lobby-room-track">트랙</span>
               <span id="lobby-room-laps">3 LAP</span>
+              <button class="btn-secondary btn-small" id="btn-lobby-copy-code" type="button">
+                Copy Room Code
+              </button>
             </div>
           </header>
+          <div class="lobby-map-preview" id="lobby-map-preview"></div>
           <div class="lobby-room-controls" id="lobby-room-controls">
             <label class="lobby-field">
               <span>트랙 변경</span>
@@ -439,6 +443,12 @@
               </select>
             </label>
           </div>
+          <div class="lobby-room-status" id="lobby-room-status">
+            Waiting for players...
+          </div>
+          <button class="btn-secondary btn-small" id="btn-lobby-edit-profile" type="button">
+            Edit Profile
+          </button>
           <ul class="lobby-player-list" id="lobby-player-list"></ul>
           <div class="lobby-room-actions">
             <button class="btn-secondary" id="btn-lobby-ready" type="button">

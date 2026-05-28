@@ -1,5 +1,6 @@
 const ACCOUNTS_KEY = 'racing_local_accounts';
 const SESSION_KEY = 'racing_local_session';
+export const AUTH_SESSION_KEY = 'racingAuthSession';
 const PURGE_FLAG_KEY = 'racing_accounts_purged_v2';
 const LEGACY_KEYS = [
   'racing_player_profile',
@@ -61,8 +62,18 @@ function readSession() {
 }
 
 function writeSession(session) {
-  if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  else localStorage.removeItem(SESSION_KEY);
+  if (session) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    saveAuthSession({
+      userId: session.accountId,
+      nickname: session.accountId,
+      email: '',
+      lastLoginAt: new Date().toISOString(),
+    });
+  } else {
+    localStorage.removeItem(SESSION_KEY);
+    clearAuthSession();
+  }
 }
 
 async function hashPassword(password, salt) {
@@ -87,7 +98,8 @@ function toUser(account) {
 
 export async function initAuth() {
   purgeLegacyAccounts();
-  const session = readSession();
+  const restored = restoreAuthSession();
+  const session = readSession() || (restored?.userId ? { accountId: restored.userId } : null);
   const accounts = readAccounts();
   const account = session?.accountId ? accounts[session.accountId] : null;
   if (account) {
@@ -101,6 +113,40 @@ export async function initAuth() {
 
 export function getCurrentUser() {
   return currentUser;
+}
+
+export function saveAuthSession(user) {
+  if (!user) return clearAuthSession();
+  const session = {
+    userId: normalizeId(user.userId || user.id || user.nickname),
+    nickname: String(user.nickname || user.name || user.id || user.userId || '').trim(),
+    email: String(user.email || '').trim(),
+    avatarColor: user.avatarColor || null,
+    profile: user.profile || null,
+    lastLoginAt: user.lastLoginAt || new Date().toISOString(),
+  };
+  if (!session.userId) return clearAuthSession();
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  return session;
+}
+
+export function restoreAuthSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    const session = raw ? JSON.parse(raw) : null;
+    if (!session?.userId) return null;
+    return {
+      ...session,
+      userId: normalizeId(session.userId),
+      nickname: session.nickname || session.userId,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearAuthSession() {
+  localStorage.removeItem(AUTH_SESSION_KEY);
 }
 
 export function isLoggedIn() {

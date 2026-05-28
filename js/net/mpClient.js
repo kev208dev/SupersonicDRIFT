@@ -101,6 +101,7 @@ export class MpClient extends EventTarget {
       playerId: this.identity.id,
       playerName: this.identity.name,
       themeColor: this.identity.themeColor,
+      profile: this.identity.profile || null,
     });
   }
 

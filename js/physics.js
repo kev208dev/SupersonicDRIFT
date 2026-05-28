@@ -18,7 +18,8 @@ const TOP_GEAR_REDLINE_MAX = 0.65;
 const DRIFT_TURN_MULT = 1.42;
 const DOUBLE_DRIFT_PENDING_SEC = 0.42;
 const DOUBLE_DRIFT_MIN_STEER = 0.025;
-const DOUBLE_DRIFT_MIN_SPEED = 12;
+export const MIN_DRIFT_SPEED = 8;
+export const DOUBLE_DRIFT_MIN_SPEED = 8;
 const DOUBLE_DRIFT_ANGLE = Math.PI * 0.42;
 const DOUBLE_DRIFT_DURATION = 0.24;
 const DOUBLE_DRIFT_BOOST_GAIN = 18;
@@ -142,7 +143,7 @@ export function updatePhysics(car, input, dt, track) {
   }
   car.sideSpeed = sSpeed;
   _applyStraightDriftBrake(car, input, dt, sSpeed);
-  car.drifting  = (input.handbrake && Math.abs(sSpeed) > 2.5 && car.speed > 16);
+  car.drifting  = (input.handbrake && car.speed > MIN_DRIFT_SPEED && (Math.abs(sSpeed) > 1.4 || Math.abs(input.steer) > 0.03));
   if (car.drifting) {
     const driftIntensity = clamp(Math.abs(sSpeed) / 45, 0.25, 1.15);
     car.boostMeter = Math.min(100, (car.boostMeter || 0) + dt * (car.boostChargeRate || 14) * 0.48 * driftIntensity);
@@ -310,7 +311,7 @@ function _resolveCollision(car, nextX, nextY, track) {
 }
 
 function _applyDriftImpulse(car, input, dt) {
-  // Enter key fires the burst impulse; intent is buffered so steering/speed
+  // E / mobile double-drift fires the burst impulse; intent is buffered so steering/speed
   // can ramp up after the press without losing the input.
   if (input.driftBurst) {
     car.driftImpulsePending = DOUBLE_DRIFT_PENDING_SEC;

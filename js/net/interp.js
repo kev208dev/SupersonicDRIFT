@@ -1,11 +1,10 @@
 // Remote-car interpolation buffer.
-// We sample server snapshots ~20Hz, render at the local frame rate, and play
-// back state 100ms behind "now" so we always have two samples to lerp between.
-// Falls back to extrapolation up to 250ms when newer samples haven't arrived.
+// We sample server snapshots frequently and render slightly behind "now" so
+// remote cars stay smooth without looking delayed.
 
-const RENDER_DELAY_MS = 150;
-const MAX_EXTRAPOLATION_MS = 120;
-const BUFFER_MAX = 12;
+const RENDER_DELAY_MS = 90;
+const MAX_EXTRAPOLATION_MS = 180;
+const BUFFER_MAX = 16;
 
 export class RemoteCarInterp {
   constructor() {

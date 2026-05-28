@@ -53,6 +53,7 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
   const listEl = document.getElementById('leaderboard-list');
   const statusEl = document.getElementById('leaderboard-status');
   renderLeaderboard(listEl, null);
+  setStatus(statusEl, 'Saving record...');
   setStatus(statusEl, 'Submit Score를 눌러 기록을 저장하세요.');
   loadResultLeaderboard({ mode, token, listEl, statusEl });
   unsubscribeLeaderboard = subscribeLeaderboard(payload => {
@@ -75,7 +76,7 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
   if (leaderboardBtn) leaderboardBtn.onclick = () => document.getElementById('btn-open-leaderboard')?.click();
   if (submitBtn) {
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Submit Score';
+    submitBtn.textContent = 'Retry Save';
     submitBtn.onclick = () => submitCurrentResult({ submitBtn, statusEl, listEl, mode });
   }
   if (shareBtn) {
@@ -92,6 +93,7 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
     };
   }
   showBannerAd('ad-game-over-banner');
+  submitCurrentResult({ submitBtn, statusEl, listEl, mode, auto: true });
 }
 
 function cleanupLeaderboard() {
@@ -117,21 +119,25 @@ async function loadResultLeaderboard({ mode, token, listEl, statusEl, statusText
   }
 }
 
-async function submitCurrentResult({ submitBtn, statusEl, listEl, mode }) {
+async function submitCurrentResult({ submitBtn, statusEl, listEl, mode, auto = false }) {
   if (!currentResult) return setStatus(statusEl, 'No result to submit yet');
   if (resultSubmitted) return setStatus(statusEl, 'Record already saved');
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Saving...';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+  }
   try {
     const result = await submitResultRecord(currentResult);
     resultSubmitted = true;
     renderLeaderboard(listEl, result.leaderboard || []);
     setStatus(statusEl, result.onlineSaved ? 'Record saved to leaderboard' : 'Online save failed. Saved locally.');
+    if (submitBtn) submitBtn.textContent = 'Saved';
   } catch {
-    submitBtn.disabled = false;
-    setStatus(statusEl, 'Could not save record');
+    resultSubmitted = false;
+    if (submitBtn) submitBtn.disabled = false;
+    setStatus(statusEl, auto ? 'Auto save failed. Tap Retry Save.' : 'Could not save record');
   } finally {
-    submitBtn.textContent = 'Submit Score';
+    if (submitBtn && !resultSubmitted) submitBtn.textContent = 'Retry Save';
   }
 }
 

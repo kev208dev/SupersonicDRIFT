@@ -24,9 +24,10 @@ import {
 import { scatterProps, updateScenery } from '../js/scenery.js';
 import { RemoteCarInterp } from '../js/net/interp.js';
 import { getSharedRenderer } from '../js/renderer.js';
+import { checkVehicleCollisions } from '../js/competitionCollision.js';
 
 const FIXED_DT = 1 / 60;
-const STATE_SEND_HZ = 20;
+const STATE_SEND_HZ = 30;
 const STATE_SEND_INTERVAL_MS = 1000 / STATE_SEND_HZ;
 const CAMERA_MODES = ['chase', 'hood', 'high'];
 
@@ -196,7 +197,7 @@ export function initMpGame({
   startEngine();
 }
 
-export function stopMpGame() {
+export function stopMpGame(options = {}) {
   running = false;
   for (const fn of mpUnsubs) { try { fn(); } catch {} }
   mpUnsubs = [];
@@ -205,7 +206,7 @@ export function stopMpGame() {
   document.removeEventListener('keydown', _onKeyDown, true);
   _showStandings(false);
 
-  if (net && net.connected) {
+  if (!options.preserveRoom && net && net.connected) {
     try { net.send({ t: 'leaveRoom' }); } catch {}
   }
 
@@ -302,6 +303,7 @@ export function updateMpGame(dt, now) {
 
   // Remote ghosts
   _updateRemoteCars(now);
+  _checkMultiplayerVehicleCollisions();
 
   // Camera follows local car
   _updateCamera(dt);
@@ -331,6 +333,7 @@ export function updateMpGame(dt, now) {
   }
 
   _updateStandings();
+  updateMinimap();
 }
 
 // ── helpers ─────────────────────────────────────────────────────
@@ -392,6 +395,9 @@ function _spawnRemote(playerInfo, staggerIndex) {
     finished: false,
     bestLapMs: null,
     lastLapMs: null,
+    lastUpdateTime: performance.now(),
+    visible: true,
+    ping: 0,
   };
   remotePlayers.set(playerInfo.id, ghost);
 }
@@ -425,12 +431,21 @@ function _makeSyntheticCar(x, y, angle) {
 function _updateRemoteCars(now) {
   for (const ghost of remotePlayers.values()) {
     const sample = ghost.interp.sample(performance.now());
-    if (!sample) continue;
+    const age = performance.now() - (ghost.lastUpdateTime || 0);
+    ghost.visible = age < 5000;
+    if (ghost.mesh) ghost.mesh.visible = ghost.visible;
+    if (ghost.mesh) ghost.mesh.traverse(child => {
+      if (child.material && 'opacity' in child.material) {
+        child.material.transparent = age > 1000 || child.material.transparent;
+        child.material.opacity = age > 1000 ? 0.42 : 1;
+      }
+    });
+    if (!sample || !ghost.visible) continue;
     const synth = ghost.syntheticCar;
     // Smooth remote visuals so 20Hz network snapshots do not pop or twitch.
-    const blend = 0.34;
+    const blend = 0.55;
     const snapDist2 = (sample.x - synth.x) ** 2 + (sample.y - synth.y) ** 2;
-    if (snapDist2 > 90000) {
+    if (snapDist2 > 2500) {
       synth.x = sample.x;
       synth.y = sample.y;
       synth.angle = sample.a;
@@ -440,10 +455,10 @@ function _updateRemoteCars(now) {
       let da = sample.a - synth.angle;
       while (da > Math.PI) da -= Math.PI * 2;
       while (da < -Math.PI) da += Math.PI * 2;
-      synth.angle += da * 0.42;
+      synth.angle += da * 0.58;
     }
-    synth.vx += (sample.vx - synth.vx) * 0.28;
-    synth.vy += (sample.vy - synth.vy) * 0.28;
+    synth.vx += (sample.vx - synth.vx) * 0.48;
+    synth.vy += (sample.vy - synth.vy) * 0.48;
     synth.gear = sample.g;
     synth.drifting = sample.drift;
     synth.boosting = sample.boost;
@@ -470,14 +485,26 @@ function _updateRemoteCars(now) {
     ghost.finished = ghost.finished || sample.finished;
 
     updateCar3D(ghost.mesh, synth, {
-      throttle: synth.boosting ? 1 : 0.4,
+      throttle: synth.boosting ? 1 : Math.min(1, Math.max(0.35, synth.speed / 180)),
       brake: 0,
     }, track);
 
     if (ghost.nameSprite) {
-      ghost.nameSprite.material.opacity = ghost.finished ? 0.55 : 1.0;
+      ghost.nameSprite.material.opacity = age > 1000 ? 0.42 : (ghost.finished ? 0.55 : 1.0);
     }
   }
+}
+
+function _checkMultiplayerVehicleCollisions() {
+  if (!raceReleased || myFinished || !car || remotePlayers.size === 0) return;
+  const opponents = [...remotePlayers.values()]
+    .filter(ghost => !ghost.finished)
+    .map(ghost => ({
+      ...ghost.syntheticCar,
+      collisionRadius: 16,
+    }));
+  const hit = checkVehicleCollisions(car, opponents, 'friendly');
+  if (hit) triggerShake(shake, 3.5);
 }
 
 function _makeNameSprite(name, color) {
@@ -677,6 +704,8 @@ function _onSnapshot(msg) {
     if (playerSnap.id === myClientId) continue;
     const ghost = remotePlayers.get(playerSnap.id);
     if (!ghost) continue;
+    ghost.lastUpdateTime = performance.now();
+    ghost.ping = Math.max(0, Date.now() - Number(playerSnap.ts || msg.T || Date.now()));
     ghost.interp.push(serverTime, playerSnap);
   }
 }
@@ -740,9 +769,94 @@ function _showStandings(on) {
       document.body.appendChild(panel);
     }
     panel.classList.remove('hidden');
+    ensureMinimapPanel();
   } else if (panel) {
     panel.classList.add('hidden');
+    document.getElementById('mp-minimap')?.classList.add('hidden');
   }
+}
+
+function ensureMinimapPanel() {
+  let panel = document.getElementById('mp-minimap');
+  if (panel) {
+    panel.classList.remove('hidden');
+    return panel;
+  }
+  panel = document.createElement('div');
+  panel.id = 'mp-minimap';
+  panel.innerHTML = '<canvas id="mp-minimap-canvas" width="190" height="132"></canvas>';
+  document.body.appendChild(panel);
+  return panel;
+}
+
+export function updateMinimap() {
+  const canvas = document.getElementById('mp-minimap-canvas');
+  if (!canvas || !track || !car) return;
+  const ctx = canvas.getContext('2d');
+  const players = [
+    { id: myClientId, x: car.x, y: car.y, color: '#2ec4b6', name: 'YOU', isMe: true, visible: true },
+    ...[...remotePlayers.values()].map(ghost => ({
+      id: ghost.id,
+      x: ghost.syntheticCar.x,
+      y: ghost.syntheticCar.y,
+      color: ghost.info?.themeColor || '#ffd166',
+      name: ghost.info?.playerName || 'Driver',
+      visible: ghost.visible !== false,
+      faded: performance.now() - (ghost.lastUpdateTime || 0) > 1000,
+    })),
+  ];
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(8,11,16,0.72)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const line = track.centerLine || [];
+  if (line.length > 1) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 9;
+    drawTrackLine(ctx, line);
+    ctx.strokeStyle = track.accentColor || '#2ec4b6';
+    ctx.lineWidth = 3;
+    drawTrackLine(ctx, line);
+  }
+  renderPlayerDots(ctx, players);
+}
+
+export function worldToMinimapPosition(position) {
+  const line = track?.centerLine || [];
+  const xs = line.map(p => p[0]);
+  const ys = line.map(p => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  return {
+    x: 12 + ((position.x - minX) / ((maxX - minX) || 1)) * 166,
+    y: 10 + ((position.y - minY) / ((maxY - minY) || 1)) * 112,
+  };
+}
+
+export function renderPlayerDots(ctx, players) {
+  for (const player of players) {
+    if (!player.visible) continue;
+    const p = worldToMinimapPosition(player);
+    ctx.globalAlpha = player.faded ? 0.45 : 1;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, player.isMe ? 5 : 4, 0, Math.PI * 2);
+    ctx.fillStyle = player.color;
+    ctx.fill();
+    ctx.strokeStyle = player.isMe ? '#ffffff' : 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawTrackLine(ctx, line) {
+  ctx.beginPath();
+  line.forEach(([x, y], index) => {
+    const p = worldToMinimapPosition({ x, y });
+    if (index === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.closePath();
+  ctx.stroke();
 }
 
 function _updateStandings() {

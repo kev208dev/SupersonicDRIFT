@@ -269,6 +269,9 @@ class MpClient {
       case 'createRoom': return this._handleCreateRoom(msg);
       case 'joinRoom':   return this._handleJoinRoom(msg);
       case 'leaveRoom':  return this._handleLeaveRoom();
+      case 'returnToRoom': return this._handleReturnToRoom();
+      case 'requestRematch': return this._handleRequestRematch();
+      case 'cancelRematch': return this._handleCancelRematch();
       case 'setReady':   return this._handleSetReady(msg);
       case 'setTrack':   return this._handleSetTrack(msg);
       case 'setLaps':    return this._handleSetLaps(msg);
@@ -288,6 +291,7 @@ class MpClient {
     this.playerId = sanitizeId(msg.playerId) || `guest_${this.id.slice(0, 6)}`;
     this.playerName = sanitizeName(msg.playerName, 'Driver');
     this.themeColor = sanitizeColor(msg.themeColor) || '#2ec4b6';
+    this.profile = sanitizeProfile(msg.profile);
     this.helloed = true;
     clearTimeout(this.helloDeadline);
     this.send({ t: 'welcome', clientId: this.id });
@@ -409,6 +413,24 @@ class MpClient {
     this.room.removePlayer(this);
   }
 
+  _handleReturnToRoom() {
+    if (!this.room) return;
+    this.ready = false;
+    this.room.returnToLobby();
+  }
+
+  _handleRequestRematch() {
+    if (!this.room) return;
+    this.ready = true;
+    this.room.requestRematch(this);
+  }
+
+  _handleCancelRematch() {
+    if (!this.room) return;
+    this.ready = false;
+    this.room.broadcastRoomState();
+  }
+
   _handleSetReady(msg) {
     if (!this.room) return;
     this.ready = !!msg.ready;
@@ -527,6 +549,8 @@ class MpClient {
 
 class Room {
   constructor(code, trackId, isPrivate) {
+    // partyState shape kept in memory for party/rematch UX:
+    // { roomId, mode, hostId, players, status, rematchVotes, lastRaceId }
     this.code = code;
     this.trackId = trackId;
     this.isPrivate = isPrivate;
@@ -541,6 +565,9 @@ class Room {
     this.raceLimitTimer = null;
     this.finishOrder = [];
     this.createdAt = Date.now();
+    this.mode = isPrivate ? 'friendly' : 'ranked';
+    this.rematchVotes = {};
+    this.lastRaceId = null;
   }
 
   addPlayer(client) {
@@ -581,9 +608,11 @@ class Room {
   }
 
   startCountdown() {
-    if (this.status !== 'waiting') return;
+    if (this.status !== 'waiting' && this.status !== 'results' && this.status !== 'rematchReady') return;
     if (this.players.size < 1) return;
     this.status = 'countdown';
+    this.lastRaceId = `${this.code}-${Date.now().toString(36)}`;
+    this.rematchVotes = {};
     this.startAt = Date.now() + COUNTDOWN_MS;
     for (const player of this.players.values()) {
       player.lap = 0;
@@ -670,7 +699,7 @@ class Room {
 
   _endRace(reason) {
     if (this.status === 'finished') return;
-    this.status = 'finished';
+    this.status = 'results';
     if (this.snapshotTimer) clearInterval(this.snapshotTimer);
     if (this.raceLimitTimer) clearTimeout(this.raceLimitTimer);
     this.snapshotTimer = null;
@@ -699,25 +728,68 @@ class Room {
       if (b.lapsCompleted !== a.lapsCompleted) return b.lapsCompleted - a.lapsCompleted;
       return (a.totalMs || Infinity) - (b.totalMs || Infinity);
     });
-    this.broadcast({ t: 'raceEnd', reason, results });
+    this.broadcast({ t: 'raceEnd', reason, results, partyState: this.getPartyState() });
+    for (const p of this.players.values()) p.ready = false;
+    this.broadcastRoomState();
+  }
 
-    setTimeout(() => {
-      this.status = 'waiting';
-      this.startAt = 0;
-      this.raceStartedAt = 0;
-      this.finishOrder = [];
-      for (const p of this.players.values()) {
-        p.ready = false;
-        p.lap = 0;
-        p.lapTimes = [];
-        p.bestLapMs = null;
-        p.finishedAt = null;
-        p.totalMs = null;
-        p.dnf = false;
-        p.lastState = null;
-      }
-      this.broadcastRoomState();
-    }, 30000);
+  returnToLobby() {
+    if (this.status === 'racing' || this.status === 'countdown') return;
+    this.status = 'waiting';
+    this.startAt = 0;
+    this.raceStartedAt = 0;
+    this.finishOrder = [];
+    this.rematchVotes = {};
+    for (const p of this.players.values()) {
+      p.ready = false;
+      p.lap = 0;
+      p.lapTimes = [];
+      p.bestLapMs = null;
+      p.finishedAt = null;
+      p.totalMs = null;
+      p.dnf = false;
+      p.lastState = null;
+    }
+    this.broadcastRoomState();
+  }
+
+  requestRematch(client) {
+    if (this.status === 'racing' || this.status === 'countdown') return;
+    this.status = 'rematchReady';
+    this.rematchVotes[client.id] = true;
+    client.ready = true;
+    const players = [...this.players.values()];
+    const allReady = players.length > 0 && players.every(p => p.ready);
+    this.broadcastRoomState();
+    if (allReady) {
+      setTimeout(() => this.startCountdown(), 450);
+    }
+  }
+
+  getPartyState() {
+    return {
+      roomId: this.code,
+      mode: this.mode,
+      hostId: this.hostId,
+      players: this.getSerializedPlayers(),
+      status: this.status,
+      rematchVotes: { ...this.rematchVotes },
+      lastRaceId: this.lastRaceId,
+    };
+  }
+
+  getSerializedPlayers() {
+    return [...this.players.values()].map(p => ({
+      id: p.id,
+      playerName: p.playerName,
+      themeColor: p.themeColor,
+      carId: p.carId,
+      carName: p.carName,
+      profile: p.profile,
+      ready: p.ready,
+      isHost: p.id === this.hostId,
+      ping: Math.max(0, Date.now() - (p.lastPongAt || Date.now())),
+    }));
   }
 
   broadcastRoomState() {
@@ -755,17 +827,10 @@ class Room {
       isPrivate: this.isPrivate,
       hostId: this.hostId,
       status: this.status,
+      partyState: this.getPartyState(),
       lapTarget: this.lapTarget,
       startAt: this.startAt,
-      players: [...this.players.values()].map(p => ({
-        id: p.id,
-        playerName: p.playerName,
-        themeColor: p.themeColor,
-        carId: p.carId,
-        carName: p.carName,
-        ready: p.ready,
-        isHost: p.id === this.hostId,
-      })),
+      players: this.getSerializedPlayers(),
     };
   }
 
@@ -871,6 +936,15 @@ function sanitizeColor(value) {
 
 function sanitizeCode(value) {
   return String(value || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 12);
+}
+
+function sanitizeProfile(value) {
+  if (!value || typeof value !== 'object') return null;
+  const keep = {};
+  for (const key of ['avatarColor', 'profileFrame', 'sticker', 'badge', 'title']) {
+    keep[key] = sanitizeId(value[key]).slice(0, 24);
+  }
+  return keep;
 }
 
 function generateRoomCode() {

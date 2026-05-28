@@ -103,7 +103,7 @@ function goToModeSelect() {
   );
 }
 
-function goToLobby() {
+function goToLobby(existingNet = null, options = {}) {
   if (!selectedCar) { goToCarSelect(); return; }
   currentScreen = 'lobby';
   showScreen('screen-lobby');
@@ -113,7 +113,9 @@ function goToLobby() {
     (car, track, room, net, startAt, myClientId) => {
       goToMpGame(car, track, room, net, startAt, myClientId);
     },
-    () => { goToModeSelect(); }
+    () => { goToModeSelect(); },
+    existingNet,
+    options
   );
 }
 
@@ -131,7 +133,7 @@ function goToMpGame(car, track, room, net, startAt, myClientId) {
     lapTarget: room.lapTarget,
     myClientId,
     roomPlayers: room.players,
-    onFinish: (payload) => goToMpResults(payload, net),
+    onFinish: (payload) => goToMpResults({ ...payload, mode: selectedMode, track, car }, net),
     onLeave: () => { net.disconnect(); goToCarSelect(); },
   });
 }
@@ -139,12 +141,25 @@ function goToMpGame(car, track, room, net, startAt, myClientId) {
 function goToMpResults(payload, net) {
   trackEvent('game_over', { mode: 'online', reason: payload?.reason });
   currentScreen = 'mpResults';
-  stopMpGame();
+  stopMpGame({ preserveRoom: selectedMode === 'friendly' });
   showScreen('screen-mpresults');
   initMpResults(
     payload,
-    () => { net.disconnect(); goToLobby(); },
-    () => { net.disconnect(); goToCarSelect(); }
+    () => {
+      if (selectedMode === 'friendly') {
+        net?.send({ t: 'requestRematch' });
+        goToLobby(net, { skipReturnToRoom: true });
+      } else {
+        net?.disconnect();
+        goToLobby();
+      }
+    },
+    () => {
+      if (selectedMode === 'friendly') goToLobby(net);
+      else { net?.disconnect(); goToCarSelect(); }
+    },
+    () => { net?.send({ t: 'leaveRoom' }); net?.disconnect(); goToMain(); },
+    net
   );
 }
 

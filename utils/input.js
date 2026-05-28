@@ -34,6 +34,9 @@ window.addEventListener('keyup', e => {
   if (_isEditableTarget(e.target)) return;
   keys[e.code] = false;
   justReleased[e.code] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Enter','NumpadEnter','KeyE'].includes(e.code)) {
+    e.preventDefault();
+  }
 }, { capture: true });
 
 window.addEventListener('blur', () => {
@@ -76,9 +79,9 @@ export function getInput() {
     throttle,
     brake,
     steer,
-    handbrake:    !!keys['Space'] || mobile.drift,
-    handbrakeJust:   wasJustPressed('Space'),
-    driftBurst:      wasJustPressed('Enter') || wasJustPressed('NumpadEnter') || wasJustPressed('KeyE') || mobile.doubleDriftJust,
+    handbrake:    !!keys['Space'] || !!keys['Enter'] || !!keys['NumpadEnter'] || mobile.drift,
+    handbrakeJust:   wasJustPressed('Space') || wasJustPressed('Enter') || wasJustPressed('NumpadEnter'),
+    driftBurst:      wasJustPressed('KeyE') || mobile.doubleDriftJust,
     boost:        !!(keys['ShiftLeft'] || keys['ShiftRight']),
     boostJust:    wasJustPressed('ShiftLeft') || wasJustPressed('ShiftRight') || mobile.boostJust,
     boostDouble:  wasJustPressed('ShiftDouble'),

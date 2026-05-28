@@ -599,6 +599,72 @@ html, body {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+.lobby-map-preview {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+  align-items: stretch;
+  background: linear-gradient(135deg, rgba(13,17,23,0.96), rgba(22,27,34,0.92));
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 12px;
+}
+.lobby-map-art {
+  min-height: 132px;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+    #080b10;
+  background-size: 18px 18px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.lobby-map-art svg { width: 100%; height: 100%; }
+.lobby-map-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.lobby-map-info span,
+.lobby-room-status {
+  color: #8b949e;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.lobby-map-info h3 {
+  color: #f0f6fc;
+  margin: 0;
+  font-size: 1.18rem;
+}
+.lobby-map-info p {
+  color: #c0c5cf;
+  margin: 0;
+  line-height: 1.45;
+  font-size: 0.86rem;
+}
+.lobby-map-info div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+.lobby-map-info b {
+  color: #0d1117;
+  background: #ffd166;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 0.72rem;
+}
+.lobby-room-status {
+  background: rgba(46,196,182,0.08);
+  border: 1px solid rgba(46,196,182,0.22);
+  border-radius: 8px;
+  padding: 9px 11px;
+}
 .lobby-player-list {
   list-style: none;
   margin: 0;
@@ -622,6 +688,77 @@ html, body {
 .lobby-player-dot { width: 14px; height: 14px; border-radius: 50%; }
 .lobby-player-name { font-weight: 800; color: #f0f6fc; }
 .lobby-player-car { font-size: 0.78rem; color: #8b949e; }
+.lobby-profile-card {
+  display: grid;
+  grid-template-columns: 54px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 11px 12px;
+}
+.lobby-profile-card.is-me { border-color: #2ec4b6; box-shadow: 0 0 0 1px rgba(46,196,182,0.16); }
+.lobby-profile-card.is-host { border-color: #ffd166; }
+.lobby-profile-card.frame-neon { box-shadow: inset 0 0 18px rgba(46,196,182,0.16); }
+.lobby-profile-card.frame-carbon { background: repeating-linear-gradient(135deg, #0d1117 0 8px, #111820 8px 16px); }
+.lobby-profile-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--avatar-color, #3b82f6);
+  color: white;
+  font-weight: 900;
+  border: 2px solid rgba(255,255,255,0.22);
+}
+.lobby-profile-main { min-width: 0; }
+.lobby-profile-name {
+  color: #f0f6fc;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lobby-profile-name small {
+  color: #0d1117;
+  background: #ffd166;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 0.62rem;
+}
+.lobby-profile-title { color: #79e2cb; font-size: 0.78rem; margin-top: 2px; }
+.lobby-profile-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #8b949e;
+  font-size: 0.75rem;
+  margin-top: 5px;
+}
+.lobby-profile-tags {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  color: #c0c5cf;
+  font-size: 0.72rem;
+}
+.lobby-profile-tags span,
+.lobby-profile-tags b,
+.lobby-player-empty {
+  border-radius: 999px;
+  background: #21262d;
+  padding: 4px 8px;
+}
+.lobby-profile-tags b.ready { background: #14442d; color: #4ade80; }
+.lobby-player-empty {
+  border: 1px dashed #30363d;
+  color: #8b949e;
+  border-radius: 8px;
+  text-align: center;
+}
 .lobby-player-flag {
   font-size: 0.72rem;
   padding: 3px 7px;
@@ -653,6 +790,54 @@ html, body {
   font-size: 0.9rem;
 }
 .lobby-toast.hidden { display: none; }
+
+.profile-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(0,0,0,0.58);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+.profile-editor-overlay.hidden { display: none; }
+.profile-editor-modal {
+  width: min(560px, 100%);
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 18px;
+  color: #f0f6fc;
+}
+.profile-editor-modal header,
+.profile-editor-modal footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.profile-editor-modal h2 { margin: 0; }
+.profile-editor-modal p { margin: 4px 0 0; color: #8b949e; }
+.profile-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 16px 0;
+}
+.profile-editor-field {
+  display: grid;
+  gap: 6px;
+  color: #8b949e;
+  font-size: 0.78rem;
+}
+.profile-editor-field select {
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #f0f6fc;
+  border-radius: 7px;
+  padding: 9px 10px;
+}
+.profile-editor-preview { margin-bottom: 16px; }
 
 #mp-standings {
   position: fixed;
@@ -758,6 +943,49 @@ html, body {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin: 0 0 18px;
+}
+#mp-minimap {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  width: 190px;
+  height: 132px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(8,11,16,0.72);
+  pointer-events: none;
+}
+#mp-minimap.hidden { display: none; }
+#mp-minimap-canvas { display: block; width: 100%; height: 100%; }
+.mp-rematch-status {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid rgba(46,196,182,0.2);
+  border-radius: 10px;
+  background: rgba(8,11,16,0.72);
+}
+.mp-rematch-status strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #79e2cb;
+}
+.mp-rematch-status div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mp-rematch-status span {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #21262d;
+  color: #c0c5cf;
+  font-size: 0.78rem;
+}
+.mp-rematch-status span.ready {
+  background: #14442d;
+  color: #4ade80;
 }
 .results-summary div {
   background: #0d1117;
@@ -1723,6 +1951,17 @@ html, body {
 }
 
 @media (max-width: 720px) {
+  .lobby-map-preview,
+  .lobby-profile-card,
+  .profile-editor-grid {
+    grid-template-columns: 1fr;
+  }
+  .lobby-map-art { min-height: 118px; }
+  .lobby-profile-tags {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
   .help-box {
     padding: 22px 18px;
   }

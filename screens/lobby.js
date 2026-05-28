@@ -2,6 +2,7 @@ import { TRACKS } from '../data/tracks.js';
 import { CAR_DATA } from '../data/cars.js';
 import { MpClient } from '../js/net/mpClient.js';
 import { getDisplayProfile } from '../utils/profile.js';
+import { getUserProfile, openProfileEditor, renderProfileCard } from '../utils/userProfile.js';
 
 const QUICK_TAB = 'quick';
 const PRIVATE_TAB = 'private';
@@ -17,15 +18,17 @@ let queueTrackId = null;
 let toastTimer = null;
 let unsubscribers = [];
 let initialized = false;
+let autoJoinAttempted = false;
 
-export function initLobby(car, startCb, backCb) {
+export function initLobby(car, startCb, backCb, existingNet = null, options = {}) {
   selectedCar = car;
   onStartRace = startCb;
   onBack = backCb;
   currentRoom = null;
-  myClientId = null;
+  myClientId = existingNet?.clientId || null;
   queueTrackId = null;
   currentTab = QUICK_TAB;
+  autoJoinAttempted = false;
 
   _populateTrackSelectors();
   _wireOnce();
@@ -33,8 +36,10 @@ export function initLobby(car, startCb, backCb) {
   _renderRoom(null);
   _renderQueueStatus(null);
 
+  if (existingNet) net = existingNet;
   _ensureSocket();
   _updateConnState(net?.connected);
+  if (net?.connected && existingNet && !options.skipReturnToRoom) net.send({ t: 'returnToRoom' });
 }
 
 export function teardownLobby() {
@@ -70,9 +75,17 @@ function _wireOnce() {
   document.getElementById('btn-lobby-quick-cancel')?.addEventListener('click', () => _cancelQuickMatch());
   document.getElementById('btn-lobby-create')?.addEventListener('click', () => _createRoom());
   document.getElementById('btn-lobby-join')?.addEventListener('click', () => _joinRoom());
+  document.getElementById('btn-lobby-copy-code')?.addEventListener('click', () => _copyRoomCode());
+  document.getElementById('btn-lobby-edit-profile')?.addEventListener('click', () => openProfileEditor());
   document.getElementById('btn-lobby-ready')?.addEventListener('click', () => _toggleReady());
   document.getElementById('btn-lobby-start')?.addEventListener('click', () => _startRace());
   document.getElementById('btn-lobby-leave')?.addEventListener('click', () => _leaveRoom());
+  document.getElementById('lobby-private-code')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') _joinRoom();
+  });
+  window.addEventListener('racing:userProfileChange', () => {
+    if (currentRoom) _renderRoom(currentRoom);
+  });
 
   document.getElementById('lobby-room-track-select')?.addEventListener('change', (e) => {
     if (!currentRoom || currentRoom.hostId !== myClientId) return;
@@ -101,10 +114,14 @@ function _switchTab(tab) {
 }
 
 function _ensureSocket() {
-  if (net) return;
   const identity = getDisplayProfile();
-  net = new MpClient();
-  unsubscribers.push(net.on('open', () => _updateConnState(true)));
+  const shouldConnect = !net;
+  if (shouldConnect) net = new MpClient();
+  if (unsubscribers.length) return;
+  unsubscribers.push(net.on('open', () => {
+    _updateConnState(true);
+    _tryAutoJoinFromQuery();
+  }));
   unsubscribers.push(net.on('close', () => _updateConnState(false)));
   unsubscribers.push(net.on('welcome', (msg) => { myClientId = msg.clientId; }));
   unsubscribers.push(net.on('joined', (msg) => {
@@ -139,7 +156,8 @@ function _ensureSocket() {
     const car = selectedCar || CAR_DATA[0];
     if (onStartRace) onStartRace(car, track, currentRoom, net, msg.startAt, myClientId);
   }));
-  net.connect(identity);
+  if (shouldConnect) net.connect({ ...identity, profile: getUserProfile() });
+  else _updateConnState(net.connected);
 }
 
 function _updateConnState(online) {
@@ -189,7 +207,7 @@ function _createRoom() {
 function _joinRoom() {
   if (!net?.connected) { _toast('서버 연결을 기다리는 중...'); return; }
   const codeInput = document.getElementById('lobby-private-code');
-  const code = (codeInput?.value || '').trim().toUpperCase();
+  const code = normalizeRoomCode(codeInput?.value);
   if (!code) { _toast('코드를 입력하세요.'); return; }
   net.send({
     t: 'joinRoom',
@@ -197,6 +215,10 @@ function _joinRoom() {
     carId: selectedCar?.id,
     carName: selectedCar?.name,
   });
+}
+
+export function normalizeRoomCode(code) {
+  return String(code || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
 }
 
 function _toggleReady() {
@@ -238,6 +260,7 @@ function _renderRoom(room) {
   if (label) label.textContent = room.isPrivate ? '친구방 코드' : '빠른 매칭 방';
 
   const trackName = TRACKS.find(t => t.id === room.trackId)?.name || room.trackId;
+  renderLobbyMapPreview(room);
   const trackEl = document.getElementById('lobby-room-track');
   if (trackEl) trackEl.textContent = `🏁 ${trackName}`;
   const lapsEl = document.getElementById('lobby-room-laps');
@@ -255,26 +278,27 @@ function _renderRoom(room) {
   if (list) {
     list.innerHTML = '';
     for (const p of room.players) {
+      const profile = p.id === myClientId ? getUserProfile() : (p.profile || {});
+      list.appendChild(renderProfileCard(profile, p, {
+        isMe: p.id === myClientId,
+        isHost: p.isHost,
+      }));
+    }
+    const emptySlots = Math.max(0, 4 - room.players.length);
+    for (let i = 0; i < emptySlots; i++) {
       const li = document.createElement('li');
-      li.className = 'lobby-player-row'
-        + (p.id === myClientId ? ' is-me' : '')
-        + (p.isHost ? ' is-host' : '');
-      const dot = document.createElement('span');
-      dot.className = 'lobby-player-dot';
-      dot.style.background = p.themeColor || '#2ec4b6';
-      const name = document.createElement('div');
-      name.innerHTML = `<div class="lobby-player-name">${escapeHtml(p.playerName)}</div>
-                       <div class="lobby-player-car">${escapeHtml(p.carName || p.carId || 'Car')}</div>`;
-      const host = document.createElement('span');
-      host.className = 'lobby-player-flag' + (p.isHost ? ' host' : '');
-      host.textContent = p.isHost ? 'HOST' : '';
-      if (!p.isHost) host.style.visibility = 'hidden';
-      const ready = document.createElement('span');
-      ready.className = 'lobby-player-flag' + (p.ready ? ' ready' : '');
-      ready.textContent = p.ready ? 'READY' : 'WAIT';
-      li.append(dot, name, host, ready);
+      li.className = 'lobby-player-empty';
+      li.textContent = 'Waiting for player...';
       list.appendChild(li);
     }
+  }
+
+  const status = document.getElementById('lobby-room-status');
+  if (status) {
+    const readyCount = room.players.filter(p => p.ready).length;
+    status.textContent = room.status === 'countdown'
+      ? 'Race countdown started.'
+      : `${readyCount}/${room.players.length} ready - map preview and profile cards are live.`;
   }
 
   const startBtn = document.getElementById('btn-lobby-start');
@@ -304,6 +328,82 @@ function _renderQueueStatus(state) {
   }
   const seconds = Math.max(0, Math.ceil(state.etaMs / 1000));
   el.textContent = `매칭 중 · ${state.count}/${state.target}명 · ${seconds}초 후 자동 시작`;
+}
+
+export function renderLobbyMapPreview(room) {
+  const wrap = document.getElementById('lobby-map-preview');
+  if (!wrap) return;
+  if (!room) {
+    wrap.innerHTML = '';
+    return;
+  }
+  const track = TRACKS.find(t => t.id === room.trackId) || TRACKS[0];
+  const points = normalizeTrackPoints(track.centerLine || []);
+  const polyline = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const estimated = estimateLapTime(track, room.lapTarget);
+  wrap.innerHTML = `
+    <div class="lobby-map-art" style="--track-accent:${escapeHtml(track.accentColor || '#2ec4b6')}">
+      <svg viewBox="0 0 180 110" aria-hidden="true">
+        <polyline points="${escapeHtml(polyline)}" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"></polyline>
+        <polyline points="${escapeHtml(polyline)}" fill="none" stroke="var(--track-accent)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      </svg>
+    </div>
+    <div class="lobby-map-info">
+      <span>Map Preview</span>
+      <h3>${escapeHtml(track.name)}</h3>
+      <p>${escapeHtml(track.desc || track.character || 'Fast technical racing sandbox track.')}</p>
+      <div>
+        <b>${escapeHtml(track.difficulty || 'Medium')}</b>
+        <b>${escapeHtml(estimated)}</b>
+        <b>${Number(room.lapTarget || 3)} LAP</b>
+      </div>
+    </div>
+  `;
+}
+
+function _copyRoomCode() {
+  const code = normalizeRoomCode(currentRoom?.code || document.getElementById('lobby-room-code')?.textContent);
+  if (!code) return _toast('Room code is not ready yet.');
+  navigator.clipboard?.writeText(code)
+    .then(() => _toast(`Room code copied: ${code}`))
+    .catch(() => _toast(`Room code: ${code}`));
+}
+
+function _tryAutoJoinFromQuery() {
+  if (autoJoinAttempted || currentRoom || !net?.connected) return;
+  const params = new URLSearchParams(window.location.search);
+  const code = normalizeRoomCode(params.get('room'));
+  if (!code) return;
+  autoJoinAttempted = true;
+  const input = document.getElementById('lobby-private-code');
+  if (input) input.value = code;
+  _switchTab(PRIVATE_TAB);
+  _joinRoom();
+}
+
+function normalizeTrackPoints(centerLine) {
+  if (!Array.isArray(centerLine) || centerLine.length < 2) return [];
+  const xs = centerLine.map(p => Number(p[0]));
+  const ys = centerLine.map(p => Number(p[1]));
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const sx = maxX - minX || 1;
+  const sy = maxY - minY || 1;
+  const step = Math.max(1, Math.floor(centerLine.length / 80));
+  return centerLine
+    .filter((_, i) => i % step === 0)
+    .map(([x, y]) => ({
+      x: 12 + ((Number(x) - minX) / sx) * 156,
+      y: 10 + ((Number(y) - minY) / sy) * 90,
+    }));
+}
+
+function estimateLapTime(track, laps = 3) {
+  const km = Number(String(track?.length || '').match(/[\d.]+/)?.[0] || 4);
+  const totalSeconds = Math.round(km * Number(laps || 3) * 24);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `Est. ${minutes}:${seconds}`;
 }
 
 function _toast(text) {

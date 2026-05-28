@@ -225,14 +225,15 @@ export function updateGame(dt, now) {
   if (input.cameraToggle) {
     cameraMode = CAMERA_MODES[(CAMERA_MODES.indexOf(cameraMode) + 1) % CAMERA_MODES.length];
   }
-  if (input.reset && raceReleased) _resetCar();
+  if (input.reset) restartRaceWithCountdown();
   if (input.escape) { stopGame(); if (onMenu) onMenu(); return; }
 
   startCountdown = Math.max(0, (startReadyAt - now) / 1000);
   const wasReleased = raceReleased;
   raceReleased = startCountdown <= 0;
   if (!wasReleased && raceReleased && timing && !timing.started) {
-    startTiming(timing, now);
+    unlockRaceInput();
+    startRaceTimer(now);
     lapStats = _makeLapStats();
   }
   const driveInput = raceReleased ? input : {
@@ -473,6 +474,36 @@ function _showResults(ev) {
   if (onResults) onResults(ev);
 }
 
+export function restartRaceWithCountdown() {
+  if (!car || !track) return;
+  if (!raceReleased && startCountdown > 0) return;
+  resetRaceState();
+  lockRaceInput();
+  showStartLights();
+}
+
+export function showStartLights() {
+  startReadyAt = performance.now() + 3200;
+  startCountdown = 3.2;
+}
+
+export function lockRaceInput() {
+  raceReleased = false;
+}
+
+export function unlockRaceInput() {
+  raceReleased = true;
+}
+
+export function resetRaceState() {
+  _resetCar();
+}
+
+export function startRaceTimer(now = performance.now()) {
+  if (!timing) timing = createTiming(getBestSectors(track.id));
+  if (!timing.started) startTiming(timing, now);
+}
+
 // ── chase camera (framerate-independent smoothing) ──────────
 function _updateCamera(dt) {
   const isHigh = cameraMode === 'high';
@@ -673,13 +704,12 @@ function _resetCar() {
   car.wallRideSide = 0;
   car.lastWallHit = null;
   if (skidBuf) skidBuf.reset();
-  // Re-create timing so the new lap starts cleanly when the line is crossed.
+  // Re-create timing so the countdown releases into a clean lap.
   timing = createTiming(getBestSectors(track.id));
   lapPath = [];
-  startCountdown = 0;
-  startReadyAt = performance.now();
-  raceReleased = true;
-  startTiming(timing, performance.now());
+  startCountdown = 3.2;
+  startReadyAt = performance.now() + 3200;
+  raceReleased = false;
   lapStats = _makeLapStats();
   lapBannerTimer = 0;
   pendingResults = null;
