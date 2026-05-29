@@ -53,6 +53,9 @@ let returnScreenAfterPanel = 'main';
 let animationFrameId = 0;
 let isGameLoopRunning = false;
 let mainLeaderboardPreviewPromise = null;
+let carSelectContext = 'garage';
+let carSelectAfterSkin = null;
+let carSelectBackHandler = () => goToMain();
 
 const initFlags = {
   garage: false,
@@ -175,11 +178,13 @@ function goToAuth() {
   goToMain();
 }
 
-function goToCarSelect() {
+function goToCarSelect(options = {}) {
+  carSelectContext = options.context || 'garage';
+  carSelectAfterSkin = typeof options.afterSkin === 'function' ? options.afterSkin : null;
+  carSelectBackHandler = typeof options.onBack === 'function' ? options.onBack : () => goToMain();
   initGarageOnce();
-  initHomeLeaderboardOnce();
+  configureCarSelectScreen(carSelectContext);
   showScreen('garage');
-  _loadHomeLeaderboard();
 }
 
 function ensureDefaultLoadout() {
@@ -191,8 +196,21 @@ function ensureDefaultLoadout() {
 function goToSkinSelect() {
   showScreen('skinSelect');
   initSkinSelect(
-    (skin) => { selectedSkin = skin; selectCarAndSkin(selectedCar?.id, skin?.id || 'default'); goToModeSelect(() => goToSkinSelect()); },
-    () => { goToCarSelect(); }
+    (skin) => {
+      selectedSkin = skin;
+      selectCarAndSkin(selectedCar?.id, skin?.id || 'default');
+      const next = carSelectAfterSkin;
+      carSelectAfterSkin = null;
+      if (next) next();
+      else goToModeSelect(() => goToSkinSelect());
+    },
+    () => {
+      goToCarSelect({
+        context: carSelectContext,
+        afterSkin: carSelectAfterSkin,
+        onBack: carSelectBackHandler,
+      });
+    }
   );
 }
 
@@ -203,8 +221,7 @@ function goToModeSelect(backCb = () => goToMain()) {
     (mode) => {
       selectedMode = mode;
       selectGameMode(mode);
-      if (mode === 'ranked' || mode === 'friendly') goToLobby();
-      else goToTrackSelect();
+      goToTrackSelect();
     },
     backCb
   );
@@ -278,7 +295,14 @@ function goToTrackSelect() {
       selectedTrack = track;
       selectedRaceOptions = { ...options, mode: selectedMode };
       updateGameState({ selectedTrack: track?.id });
-      goToGame();
+      goToCarSelect({
+        context: 'raceSetup',
+        onBack: () => goToTrackSelect(),
+        afterSkin: () => {
+          if (selectedMode === 'ranked' || selectedMode === 'friendly') goToLobby();
+          else goToGame();
+        },
+      });
     },
     ()      => { goToModeSelect(); },
     { mode: selectedMode }
@@ -345,6 +369,27 @@ function initGarageOnce() {
     goToSkinSelect();
   });
   console.timeEnd('initGarage');
+}
+
+function configureCarSelectScreen(context = 'garage') {
+  const isRaceSetup = context === 'raceSetup';
+  const title = document.querySelector('#screen-carselect .screen-header h1');
+  const subtitle = document.querySelector('#screen-carselect .screen-header .subtitle');
+  const continueBtn = document.getElementById('btn-to-track');
+  const backBtn = document.getElementById('btn-garage-back');
+  const leaderboard = document.querySelector('#screen-carselect .home-leaderboard');
+  const layout = document.querySelector('#screen-carselect .home-layout');
+
+  if (title) title.textContent = isRaceSetup ? 'Car Select' : 'Garage';
+  if (subtitle) {
+    subtitle.textContent = isRaceSetup
+      ? 'Choose the car you want to race with.'
+      : 'View cars, stats, and unlock progress.';
+  }
+  if (continueBtn) continueBtn.textContent = isRaceSetup ? 'Continue' : 'Select Car';
+  if (backBtn) backBtn.onclick = () => carSelectBackHandler?.();
+  if (leaderboard) leaderboard.hidden = true;
+  if (layout) layout.classList.toggle('car-select-focused', true);
 }
 
 function initLobbyOnce() {

@@ -79,6 +79,7 @@ function _render() {
   const ghostToggle = document.getElementById('track-ghost-toggle');
   if (modeEl) modeEl.textContent = raceMode === 'timeTrial' ? 'Time Trial - Official records' : raceMode === 'ranked' ? 'Ranked Beta - no official time records' : 'Friendly Online - no official records';
   if (ghostBox) ghostBox.classList.toggle('hidden', raceMode !== 'timeTrial');
+  if (startBtn) startBtn.textContent = 'Choose Car';
   if (backBtn)  backBtn.onclick  = () => { if (onBack)   onBack(); };
   if (startBtn) startBtn.onclick = () => {
     if (onSelect) onSelect(TRACKS[selectedIndex], {
