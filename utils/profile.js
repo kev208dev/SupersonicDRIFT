@@ -239,7 +239,7 @@ export function getSkinProgressText(skin) {
   if (unlock.type === 'noThrottleFinish') {
     return `${Number(stats.no_throttle_finishes || 0)}회 달성`;
   }
-  if (unlock.type === 'rankOne') return '온라인 랭킹 1위 필요';
+  if (unlock.type === 'rankOne') return 'Reach rank #1 on the leaderboard';
   if (unlock.type === 'comingSoon') return 'Unlock feature coming soon';
   if (unlock.type === 'trackFinish') {
     return `${unlock.trackId === 'aurora_endurance' ? 'Aurora Endurance' : unlock.trackId} 완주 필요`;

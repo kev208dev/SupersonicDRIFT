@@ -1,14 +1,16 @@
 import { TRACKS } from '../data/tracks.js';
+import { fetchTrackLeaderboard } from '../utils/leaderboard.js';
+import { getBestLap } from '../utils/storage.js';
 
 let selectedIndex = 0;
 let onSelect      = null;
 let onBack        = null;
-let raceMode      = 'online';
+let raceMode      = 'timeTrial';
 
 export function initTrackSelect(cb, backCb, options = {}) {
   onSelect      = cb;
   onBack        = backCb;
-  raceMode      = options.mode || 'online';
+  raceMode      = options.mode || 'timeTrial';
   selectedIndex = 0;
   _render();
 }
@@ -35,19 +37,24 @@ function _render() {
     const info = document.createElement('div');
     info.className = 'track-info';
     const cornerText = track.famousCorners?.length ? track.famousCorners.join(' / ') : '';
+    const trackInfo = getTrackInfo(track.id);
     info.innerHTML = `
       <h3>${track.name}</h3>
-      ${track.gpName ? `<span class="track-gp">${track.country} · ${track.gpName}</span>` : ''}
+      <span class="desc">Recommended car: ${trackInfo.recommendedCar}</span>
+      <span class="desc">My best: ${trackInfo.myBest}</span>
+      ${track.gpName ? `<span class="track-gp">${track.country} - ${track.gpName}</span>` : ''}
       <span>${track.length}</span>
+      <span class="ui-highlight-record">Target: ${formatTrackTime(track.targetTime)}</span>
+      <span>Silver: ${formatTrackTime(track.silverTime)} - Gold: ${formatTrackTime(track.goldTime)}</span>
       ${track.laps ? `<span>${track.laps} laps</span>` : ''}
       ${track.turns ? `<span>${track.turns} turns</span>` : ''}
       ${track.firstGrandPrix ? `<span>since ${track.firstGrandPrix}</span>` : ''}
-      <span>난이도: ${track.difficulty}</span>
+      <span>Difficulty: ${track.difficulty}</span>
       ${track.desc ? `<span class="desc">${track.desc}</span>` : ''}
       ${track.character ? `<span class="desc track-character">${track.character}</span>` : ''}
       ${cornerText ? `<span class="desc">Famous corners: ${cornerText}</span>` : ''}
-      ${track.fastestLapRecord ? `<span class="desc">Fastest lap: ${track.fastestLapRecord} · ${track.fastestLapDriver}</span>` : ''}
-      ${track.polePositionRecord ? `<span class="desc">Pole record: ${track.polePositionRecord} · ${track.polePositionDriver}</span>` : ''}
+      ${track.fastestLapRecord ? `<span class="desc">Fastest lap: ${track.fastestLapRecord} - ${track.fastestLapDriver}</span>` : ''}
+      ${track.polePositionRecord ? `<span class="desc">Pole record: ${track.polePositionRecord} - ${track.polePositionDriver}</span>` : ''}
       ${track.mostWinsDriver ? `<span class="desc">Most wins: ${track.mostWinsDriver} (${track.mostWinsCount})</span>` : ''}
       ${track.iconicMomentTitle ? `<span class="desc">Iconic moment: ${track.iconicMomentTitle}</span>` : ''}
     `;
@@ -56,7 +63,7 @@ function _render() {
     if (i === selectedIndex) {
       const badge = document.createElement('span');
       badge.className = 'track-selected-badge';
-      badge.textContent = '✓ 선택됨';
+      badge.textContent = 'Selected';
       card.appendChild(badge);
     }
 
@@ -70,18 +77,47 @@ function _render() {
   const modeEl = document.getElementById('track-mode-label');
   const ghostBox = document.getElementById('ghost-option-box');
   const ghostToggle = document.getElementById('track-ghost-toggle');
-  if (modeEl) modeEl.textContent = raceMode === 'offline' ? '오프라인 연습' : '온라인 랭킹';
-  if (ghostBox) ghostBox.classList.toggle('hidden', raceMode !== 'offline');
+  if (modeEl) modeEl.textContent = raceMode === 'timeTrial' ? 'Time Trial - Official records' : raceMode === 'ranked' ? 'Ranked Beta - no official time records' : 'Friendly Online - no official records';
+  if (ghostBox) ghostBox.classList.toggle('hidden', raceMode !== 'timeTrial');
   if (backBtn)  backBtn.onclick  = () => { if (onBack)   onBack(); };
   if (startBtn) startBtn.onclick = () => {
     if (onSelect) onSelect(TRACKS[selectedIndex], {
       mode: raceMode,
-      ghostEnabled: raceMode === 'offline' && !!ghostToggle?.checked,
+      ghostEnabled: raceMode === 'timeTrial' && !!ghostToggle?.checked,
     });
   };
 }
 
 // ── mini map drawing ─────────────────────────────────────────
+export function getTrackInfo(trackId) {
+  const track = TRACKS.find(item => item.id === trackId) || TRACKS[0];
+  const best = getBestLap('', track.id);
+  return {
+    ...track,
+    averageTime: track.fastestLapRecord || '48.2s',
+    recommendedCar: 'GT3',
+    myBest: best ? `${Math.round(best / 1000)}s` : 'No record',
+  };
+}
+
+export function renderTrackSelect() {
+  _render();
+}
+
+export { fetchTrackLeaderboard };
+
+export function formatTrackTime(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value)) return 'No target';
+  return `${(value / 1000).toFixed(1)}s`;
+}
+
+export async function renderTrackLeaderboard(trackId, target = document.getElementById('track-leaderboard-preview')) {
+  if (!target) return;
+  const result = await fetchTrackLeaderboard(trackId, 'today', raceMode || 'timeTrial', 5);
+  target.innerHTML = (result.leaderboard || []).map(row => `<div>${row.rank}. ${row.playerName} ${row.lapMs}</div>`).join('') || 'No records yet';
+}
+
 function _drawMiniMap(canvas, track) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;

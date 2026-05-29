@@ -1,4 +1,5 @@
 import { CAR_DATA } from '../data/cars.js';
+import { getCarPowerTotal, isTranscendCar, renderCarStatRows } from '../js/carStats.js';
 import { isCarUnlocked, unlockProgressText, unlockText } from '../utils/unlocks.js';
 import { getProfile, onProfileChange, purchaseCar } from '../utils/profile.js';
 
@@ -66,17 +67,15 @@ function _render() {
     card.appendChild(previewDiv);
     card.insertAdjacentHTML('beforeend', `
       <div class="car-name">${car.name}</div>
-      <span class="car-badge">${locked ? (Number(car.price || 0) <= 0 ? 'FREE' : 'SHOP') : car.rarity || car.category}</span>
+        <span class="car-badge ${isTranscendCar(car.id) ? 'transcend-badge' : ''}">${isTranscendCar(car.id) ? 'TRANSCEND' : locked ? (Number(car.price || 0) <= 0 ? 'LOCKED' : 'SHOP') : car.rarity || car.category}</span>
       <div class="car-tags">
         <span>${car.driveType}</span>
         <span>${car.power} hp</span>
         <span>${locked ? `${Number(car.price || 0).toLocaleString()} C` : 'OWNED'}</span>
       </div>
-      <div class="car-spec">
-        ${_statRow('속도', car.maxSpeed / 340)}
-        ${_statRow('가속', (5.0 - parseFloat(car.acceleration)) / 2.2)}
-        ${_statRow('그립', car.grip / 2.2)}
-        ${_statRow('부스트', ((car.boostChargeRate || 12) / Math.max(1, car.boostCost || 40)) * 1.35)}
+      <div class="car-power">Total Power <b>${getCarPowerTotal(car.id)}</b></div>
+      <div class="car-spec car-stat-list">
+        ${renderCarStatRows(car)}
       </div>
     `);
 
@@ -89,19 +88,19 @@ function _render() {
       lock.innerHTML = `
         <b>${unlockText(car)}</b>
         <span>${unlockProgressText(car)}</span>
-        <button class="btn-secondary btn-small car-buy" type="button">${canBuy ? '구매' : '잠김'}</button>
+        <button class="btn-secondary btn-small car-buy" type="button">${canBuy ? 'Buy' : 'Locked'}</button>
       `;
       const buy = lock.querySelector('.car-buy');
       buy.disabled = !canBuy;
       buy.addEventListener('click', async event => {
         event.stopPropagation();
         try {
-          buy.textContent = '구매 중...';
+          buy.textContent = 'Buying...';
           await purchaseCar(car);
           selectedIndex = idx;
           _render();
         } catch (error) {
-          buy.textContent = error?.message === 'login-required' ? '로그인 필요' : '코인 부족';
+          buy.textContent = error?.message === 'login-required' ? 'Login needed' : 'Not enough coins';
           setTimeout(() => _render(), 900);
         }
       });
@@ -111,7 +110,7 @@ function _render() {
     card.addEventListener('click', () => {
       if (locked) {
         const descEl = document.getElementById('car-desc');
-        if (descEl) descEl.textContent = `${car.name} 잠금해제 조건: ${unlockText(car)}. ${unlockProgressText(car)}.`;
+        if (descEl) descEl.textContent = `${car.name} unlock condition: ${unlockText(car)}. ${unlockProgressText(car)}.`;
         return;
       }
       selectedIndex = idx;
@@ -124,6 +123,7 @@ function _render() {
   const descEl = document.getElementById('car-desc');
   const selCar = CAR_DATA[selectedIndex];
   if (descEl && selCar) descEl.textContent = selCar.description;
+  showCarCinematic(selCar?.id, selCar?.skin?.id || 'factory');
 
   // ── confirm button ──
   const btn = document.getElementById('btn-to-track');
@@ -147,6 +147,76 @@ function _statRow(label, value) {
       <b><i style="width:${pct}%"></i></b>
     </div>
   `;
+}
+
+export function initCarCinematicPreview() {
+  const host = document.getElementById('car-cinematic-preview');
+  if (host) return host;
+  const screen = document.getElementById('screen-carselect') || document.getElementById('screen-skinselect');
+  const grid = document.getElementById('car-grid');
+  if (!screen || !grid) return null;
+  const panel = document.createElement('section');
+  panel.id = 'car-cinematic-preview';
+  panel.className = 'car-cinematic-preview ui-card';
+  panel.innerHTML = `
+    <canvas id="car-cinematic-canvas" width="520" height="220" aria-label="Selected car preview"></canvas>
+    <div class="car-cinematic-info" id="car-cinematic-info"></div>
+  `;
+  screen.insertBefore(panel, grid.parentElement || grid);
+  return panel;
+}
+
+export function showCarCinematic(carId, skinId = 'factory') {
+  const car = CAR_DATA.find(item => item.id === carId) || CAR_DATA[0];
+  const panel = initCarCinematicPreview();
+  const canvas = document.getElementById('car-cinematic-canvas');
+  if (!panel || !canvas || !car) return;
+  applyPreviewSkin(carId, skinId);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const bg = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  bg.addColorStop(0, '#050816');
+  bg.addColorStop(0.55, '#111827');
+  bg.addColorStop(1, '#020617');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(56,189,248,0.16)';
+  ctx.beginPath();
+  ctx.ellipse(canvas.width / 2, canvas.height - 42, 180, 24, 0, 0, Math.PI * 2);
+  ctx.fill();
+  const preview = document.createElement('canvas');
+  preview.width = 320;
+  preview.height = 140;
+  _drawCarPreview(preview, car);
+  ctx.drawImage(preview, 100, 44, 320, 140);
+  updateCarPreviewStats(carId);
+}
+
+export function updateCarPreviewStats(carId) {
+  const car = CAR_DATA.find(item => item.id === carId) || CAR_DATA[0];
+  const info = document.getElementById('car-cinematic-info');
+  if (!info || !car) return;
+  info.innerHTML = `
+    <span class="ui-kicker">${car.category}</span>
+    <h2 class="ui-section-title">${car.name}</h2>
+    <p class="ui-muted">${car.description}</p>
+    <div class="car-power cinematic-power">Total Power <b>${getCarPowerTotal(car.id)}</b></div>
+    <div class="car-stat-list">${renderCarStatRows(car)}</div>
+  `;
+}
+
+export function rotatePreviewCar() {
+  // The preview uses a lightweight cinematic redraw, so rotation is intentionally
+  // simulated by the showroom glow rather than a separate heavy scene.
+}
+
+export function applyPreviewSkin(carId, skinId) {
+  return { carId, skinId };
+}
+
+export function stopCarCinematicPreview() {
+  const panel = document.getElementById('car-cinematic-preview');
+  if (panel) panel.remove();
 }
 
 // ── mini car drawing ─────────────────────────────────────────

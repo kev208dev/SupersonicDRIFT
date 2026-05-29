@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createCarDesign } from './carDesigns.js';
+import { mapStatToPhysics, normalizeCarStats } from './carStats.js';
 import { getSkinById } from '../data/skins.js';
 
 const CAR_DESIGN_BY_ID = {
@@ -18,23 +19,31 @@ const CAR_DESIGN_BY_ID = {
 
 // ── physics state ────────────────────────────────────────────
 export function createCar(carData, startPos) {
+  const stats = normalizeCarStats(carData.stats, carData.tier);
+  const statPhysics = mapStatToPhysics(stats);
   return {
     id:          carData.id,
     name:        carData.name,
     mass:        carData.mass,
     power:       carData.power,
     price:       carData.price || 0,
-    maxSpeed:    carData.maxSpeed,
-    grip:        carData.grip,
+    maxSpeed:    Math.max(180, statPhysics.maxSpeed),
+    baseMaxSpeed: carData.maxSpeed,
+    accelerationForce: statPhysics.accelerationForce,
+    traction: statPhysics.traction,
+    turnStrength: statPhysics.turnStrength,
+    boostStatMultiplier: statPhysics.boostMultiplier,
+    carStats: stats,
+    grip:        carData.grip * statPhysics.traction,
     wheelbase:   carData.wheelbase,
     dragCoef:    carData.dragCoef,
     maxRpm:      carData.maxRpm,
     maxTorque:   carData.maxTorque,
-    boostChargeRate: carData.boostChargeRate || 14,
+    boostChargeRate: (carData.boostChargeRate || 14) * statPhysics.boostRecharge,
     boostCost:   carData.boostCost || 38,
-    boostDuration: carData.boostDuration || 1.45,
-    boostSpeedMult: carData.boostSpeedMult || 1.23,
-    boostAccelMult: carData.boostAccelMult || 1.35,
+    boostDuration: (carData.boostDuration || 1.45) * (statPhysics.boostDuration / 1.4),
+    boostSpeedMult: (carData.boostSpeedMult || 1.23) * (statPhysics.boostMultiplier / 1.2),
+    boostAccelMult: (carData.boostAccelMult || 1.35) * (statPhysics.boostMultiplier / 1.2),
     flameScale:  carData.flameScale || 1,
     skin:        carData.skin || null,
     color:       carData.color,

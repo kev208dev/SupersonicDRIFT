@@ -51,12 +51,12 @@ export function updatePhysics(car, input, dt, track) {
   const drsPower = clamp(car.drsPower || 0, 0, 1);
   const powerToWeight = (car.power || car.maxTorque || 520) / Math.max(650, car.mass || 1200);
   const powerFactor = clamp(0.84 + powerToWeight * 0.58, 0.92, 1.55);
-  const handlingFactor = clamp(0.90 + (car.grip || 1.6) * 0.075, 0.98, 1.12);
+  const handlingFactor = clamp((0.90 + (car.grip || 1.6) * 0.075) * (car.turnStrength || 1), 0.82, 1.34);
   const maxSpeed  = car.maxSpeed * TOP_SPEED_MULT
     * (1 + ((car.boostSpeedMult || 1.23) - 1) * boostPower)
     * (1 + 0.28 * drsPower);
   const massFactor = Math.pow(1200 / Math.max(650, car.mass || 1200), 0.28);
-  const baseAccel = (40 + car.maxTorque * 0.105) * massFactor * powerFactor * ACCEL_MULT
+  const baseAccel = (40 + car.maxTorque * 0.105) * massFactor * powerFactor * ACCEL_MULT * (car.accelerationForce || 1)
     * (1 + ((car.boostAccelMult || 1.35) - 1) * boostPower)
     * (1 + 0.38 * drsPower);
   const brakeRate = baseAccel * BRAKE_MULT * handlingFactor * Math.pow(1250 / Math.max(700, car.mass || 1250), 0.1);

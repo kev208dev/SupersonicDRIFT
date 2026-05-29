@@ -82,7 +82,7 @@ export async function fetchLeaderboard(typeOrCarId = '', modeOrTrackId = '', lim
   return res.json();
 }
 
-export async function fetchModeLeaderboard(type = 'allTime', mode = 'timeTrial', limit = 20) {
+export async function fetchModeLeaderboard(type = 'allTime', mode = 'timeTrial', limit = 20, trackId = '') {
   const normalizedType = normalizeBoardType(type);
   const normalizedMode = normalizeMode(mode);
   try {
@@ -97,10 +97,10 @@ export async function fetchModeLeaderboard(type = 'allTime', mode = 'timeTrial',
         completedAt: timestampToIso(row.createdAt || row.updatedAt),
       }))
       .filter(row => normalizedMode === 'timeTrial' && matchesBoardType(row, normalizedType));
-    const local = getLocalLeaderboardRecords({ type: normalizedType, mode: normalizedMode, limit: 200 });
+    const local = getLocalLeaderboardRecords({ type: normalizedType, mode: normalizedMode, limit: 200, trackId });
     return { leaderboard: rankRecords([...local, ...rows], normalizedMode).slice(0, limit) };
   } catch {
-    return { leaderboard: getLocalLeaderboardRecords({ type: normalizedType, mode: normalizedMode, limit }) };
+    return { leaderboard: getLocalLeaderboardRecords({ type: normalizedType, mode: normalizedMode, limit, trackId }) };
   }
 }
 
@@ -175,15 +175,21 @@ export function saveLocalLeaderboardRecord(result) {
   return record;
 }
 
-export function getLocalLeaderboardRecords({ type = 'allTime', mode = 'timeTrial', limit = 20 } = {}) {
+export function getLocalLeaderboardRecords({ type = 'allTime', mode = 'timeTrial', limit = 20, trackId = '' } = {}) {
   const normalizedType = normalizeBoardType(type);
   const normalizedMode = normalizeMode(mode);
   return rankRecords(
     readLocalRecords().filter(record =>
-      normalizeMode(record.mode) === normalizedMode && matchesBoardType(record, normalizedType)
+      normalizeMode(record.mode) === normalizedMode
+      && (!trackId || record.trackId === trackId)
+      && matchesBoardType(record, normalizedType)
     ),
     normalizedMode
   ).slice(0, limit);
+}
+
+export async function fetchTrackLeaderboard(trackId, type = 'allTime', mode = 'timeTrial', limit = 20) {
+  return fetchModeLeaderboard(type, mode, limit, trackId);
 }
 
 export function getGuestNickname() {
@@ -411,7 +417,10 @@ function normalizeResultRecord(result = {}) {
     lapMs: finishTime,
     score: Number(result.score ?? scoreFromTime(finishTime)),
     rating: Number(result.rating ?? result.rankedScore ?? result.score ?? 0),
+    ratingBefore: Number(result.ratingBefore ?? result.oldRating ?? 0),
     ratingChange: Number(result.ratingChange || 0),
+    ratingAfter: Number(result.ratingAfter ?? result.newRating ?? result.rating ?? 0),
+    seasonId: result.seasonId || '',
     trackId: track.id || result.trackId || '',
     trackName: track.name || result.trackName || 'Track',
     carId: car.id || result.carId || '',
@@ -459,7 +468,7 @@ function isBoardType(value) {
 function normalizeMode(mode) {
   const text = String(mode || 'timeTrial');
   if (text === 'online') return 'ranked';
-  if (text === 'offline') return 'timeTrial';
+  if (text === 'singlePlayer') return 'timeTrial';
   return ['ranked', 'timeTrial', 'friendly'].includes(text) ? text : 'timeTrial';
 }
 

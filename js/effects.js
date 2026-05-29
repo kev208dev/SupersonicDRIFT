@@ -336,3 +336,31 @@ export function updateFovPump(camera, kmh, maxKmh, boostActive, dt) {
   camera.fov += (target - camera.fov) * k;
   camera.updateProjectionMatrix();
 }
+
+export function spawnDriftSmoke(position, pool = null) {
+  if (!pool || !position) return false;
+  spawnSmoke(pool, position.x || 0, position.y || 2, position.z || 0);
+  return true;
+}
+
+export function showBoostEffect(target = document.body) {
+  target?.classList?.add('boost-effect-active');
+  setTimeout(() => target?.classList?.remove('boost-effect-active'), 420);
+}
+
+export function showCollisionEffect(position, sparkPool = null) {
+  if (!sparkPool || !position) return false;
+  spawnSparks(sparkPool, position.x || 0, position.y || 4, position.z || 0, 10);
+  return true;
+}
+
+export function triggerScreenShake(shake, intensity = 4, duration = 0.2) {
+  if (!shake) return;
+  shake.duration = Math.max(shake.duration || 0, duration);
+  triggerShake(shake, intensity);
+}
+
+export function showNewRecordEffect(target = document.body) {
+  target?.classList?.add('new-record-effect');
+  setTimeout(() => target?.classList?.remove('new-record-effect'), 900);
+}

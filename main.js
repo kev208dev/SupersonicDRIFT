@@ -34,6 +34,12 @@ import { initAnalytics, trackEvent } from './js/analytics.js';
 import { submitScore as submitPlaceholderScore } from './js/leaderboard.js';
 import { clearRaceRecordsOnce } from './utils/storage.js';
 import { initMobileControls, setMobileControlsVisible } from './js/mobileControls.js';
+import { updateGameState, selectGameMode, selectCarAndSkin } from './js/state.js';
+import { renderSeasonPanel, fetchSeasonLeaderboard } from './js/seasons.js';
+import { getRating, renderRatingBadge } from './js/rating.js';
+import { renderMissionPanel, updateMissionProgress } from './js/missions.js';
+import { renderGarage } from './js/unlocks.js';
+import { renderOnboarding } from './js/onboarding.js';
 
 let currentScreen = 'main';
 let selectedCar   = null;
@@ -43,28 +49,125 @@ let selectedMode  = 'timeTrial';
 let selectedRaceOptions = {};
 let lastTime      = 0;
 let authMode      = 'login';
+let returnScreenAfterPanel = 'main';
+let animationFrameId = 0;
+let isGameLoopRunning = false;
+let mainLeaderboardPreviewPromise = null;
+
+const initFlags = {
+  garage: false,
+  gameScene: false,
+  fullLeaderboard: false,
+  miniMap: false,
+  recordLine: false,
+  carPreview: false,
+  lobby: false,
+  bonusDraw: false,
+  homeLeaderboard: false,
+  mainLeaderboardPreview: false,
+};
 
 // ── screen helpers ──────────────────────────────────────────
+function hideAllScreens() {
+  document.querySelectorAll('.screen').forEach(el => {
+    el.classList.remove('active', 'is-active');
+    el.classList.add('is-hidden-screen');
+    el.setAttribute('aria-hidden', 'true');
+  });
+  document.querySelectorAll('.modal.is-open').forEach(el => {
+    el.classList.remove('is-open');
+    el.setAttribute('aria-hidden', 'true');
+  });
+  document.getElementById('profile-panel')?.classList.add('hidden');
+}
+
+function screenId(screenName) {
+  const aliases = {
+    main: 'screen-main',
+    login: 'screen-auth',
+    auth: 'screen-auth',
+    garage: 'screen-carselect',
+    carSelect: 'screen-carselect',
+    modeSelect: 'screen-modeselect',
+    trackSelect: 'screen-trackselect',
+    skinSelect: 'screen-skinselect',
+    friendlyRoom: 'screen-lobby',
+    rankedLobby: 'screen-lobby',
+    lobby: 'screen-lobby',
+    race: 'screen-race',
+    result: 'screen-results',
+    results: 'screen-results',
+    mpResults: 'screen-mpresults',
+    leaderboard: 'leaderboard-overlay',
+    help: 'screen-help',
+    bonusDraw: 'starter-reward-overlay',
+  };
+  return screenName?.startsWith?.('screen-') ? screenName : (aliases[screenName] || screenName);
+}
+
 function showScreen(id) {
+  const resolved = screenId(id);
   setMobileControlsVisible(false);
-  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-  const el = document.getElementById(id);
-  if (el) el.classList.add('active');
+  hideAllScreens();
+  if (id !== 'race' && id !== 'game' && id !== 'mpGame') {
+    hideRaceCanvas();
+  }
+  const el = document.querySelector(`[data-screen="${id}"]`) || document.getElementById(resolved);
+  if (el) {
+    el.classList.remove('hidden', 'is-hidden-screen');
+    el.classList.add('is-active');
+    el.setAttribute('aria-hidden', 'false');
+  }
+  if (!el && id !== 'race') console.warn('Screen not found:', id);
+  currentScreen = id?.replace?.(/^screen-/, '') || id;
+  if (window.gameState) window.gameState.currentScreen = currentScreen;
+  updateGameState({ currentScreen });
+  console.log('[Screen]', currentScreen);
 }
 function hideScreens() {
-  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  hideAllScreens();
+}
+
+function setActiveScreen(screenName) {
+  showScreen(screenName);
+}
+
+function getActiveScreen() {
+  const active = document.querySelector('.screen.is-active');
+  return active?.dataset?.screen || active?.id || currentScreen || null;
+}
+
+window.showScreen = showScreen;
+window.hideAllScreens = hideAllScreens;
+window.setActiveScreen = setActiveScreen;
+window.getActiveScreen = getActiveScreen;
+
+function showRaceCanvas() {
+  document.getElementById('three-canvas')?.style.setProperty('display', 'block');
+  document.getElementById('hud-canvas')?.style.setProperty('display', 'block');
+}
+
+function hideRaceCanvas() {
+  document.getElementById('three-canvas')?.style.setProperty('display', 'none');
+  document.getElementById('hud-canvas')?.style.setProperty('display', 'none');
 }
 
 // ── transitions ─────────────────────────────────────────────
 function goToMain() {
-  currentScreen = 'main';
-  showScreen('screen-main');
+  updateGameState({ currentScreen: 'main', isRaceRunning: false });
+  showScreen('main');
   showBannerAd('ad-main-menu-banner');
+  initMainScreen();
+}
+
+function initMainScreen() {
+  renderSeasonPanel();
+  renderMissionPanel();
+  if (!initFlags.mainLeaderboardPreview) _loadMainLeaderboardPreview();
 }
 
 function _openAuth() {
-  currentScreen = 'auth';
-  showScreen('screen-auth');
+  showScreen('login');
   _resetAuthForm();
 }
 
@@ -73,40 +176,45 @@ function goToAuth() {
 }
 
 function goToCarSelect() {
-  currentScreen = 'carSelect';
-  showScreen('screen-carselect');
-  initCarSelect((car) => {
-    selectedCar = car;
-    goToSkinSelect();
-  });
+  initGarageOnce();
+  initHomeLeaderboardOnce();
+  showScreen('garage');
+  _loadHomeLeaderboard();
+}
+
+function ensureDefaultLoadout() {
+  if (!selectedCar) selectedCar = CAR_DATA[0];
+  if (!selectedSkin) selectedSkin = { id: 'default', name: 'Default' };
+  selectCarAndSkin(selectedCar?.id, selectedSkin?.id || 'default');
 }
 
 function goToSkinSelect() {
-  currentScreen = 'skinSelect';
-  showScreen('screen-skinselect');
+  showScreen('skinSelect');
   initSkinSelect(
-    (skin) => { selectedSkin = skin; goToModeSelect(); },
+    (skin) => { selectedSkin = skin; selectCarAndSkin(selectedCar?.id, skin?.id || 'default'); goToModeSelect(() => goToSkinSelect()); },
     () => { goToCarSelect(); }
   );
 }
 
-function goToModeSelect() {
-  currentScreen = 'modeSelect';
-  showScreen('screen-modeselect');
+function goToModeSelect(backCb = () => goToMain()) {
+  ensureDefaultLoadout();
+  showScreen('modeSelect');
   initModeSelect(
     (mode) => {
       selectedMode = mode;
+      selectGameMode(mode);
       if (mode === 'ranked' || mode === 'friendly') goToLobby();
       else goToTrackSelect();
     },
-    () => { goToSkinSelect(); }
+    backCb
   );
 }
 
 function goToLobby(existingNet = null, options = {}) {
   if (!selectedCar) { goToCarSelect(); return; }
-  currentScreen = 'lobby';
-  showScreen('screen-lobby');
+  updateGameState({ currentScreen: 'lobby', selectedMode, isRaceRunning: false });
+  initLobbyOnce();
+  showScreen('lobby');
   const raceCar = { ...selectedCar, skin: selectedSkin };
   initLobby(
     raceCar,
@@ -121,8 +229,9 @@ function goToLobby(existingNet = null, options = {}) {
 
 function goToMpGame(car, track, room, net, startAt, myClientId) {
   trackEvent('game_start', { mode: 'online', track_id: track?.id, car_id: car?.id });
-  currentScreen = 'mpGame';
   hideScreens();
+  currentScreen = 'mpGame';
+  showRaceCanvas();
   setMobileControlsVisible(true);
   detachNet();
   initMpGame({
@@ -140,9 +249,8 @@ function goToMpGame(car, track, room, net, startAt, myClientId) {
 
 function goToMpResults(payload, net) {
   trackEvent('game_over', { mode: 'online', reason: payload?.reason });
-  currentScreen = 'mpResults';
   stopMpGame({ preserveRoom: selectedMode === 'friendly' });
-  showScreen('screen-mpresults');
+  showScreen('mpResults');
   initMpResults(
     payload,
     () => {
@@ -164,12 +272,12 @@ function goToMpResults(payload, net) {
 }
 
 function goToTrackSelect() {
-  currentScreen = 'trackSelect';
-  showScreen('screen-trackselect');
+  showScreen('trackSelect');
   initTrackSelect(
     (track, options = {}) => {
       selectedTrack = track;
       selectedRaceOptions = { ...options, mode: selectedMode };
+      updateGameState({ selectedTrack: track?.id });
       goToGame();
     },
     ()      => { goToModeSelect(); },
@@ -179,9 +287,24 @@ function goToTrackSelect() {
 
 function goToGame() {
   trackEvent('game_start', { mode: selectedRaceOptions?.mode || selectedMode, track_id: selectedTrack?.id, car_id: selectedCar?.id });
-  currentScreen = 'game';
+  const mode = selectedRaceOptions?.mode || selectedMode;
+  updateGameState({
+    currentScreen: 'game',
+    selectedMode: mode,
+    selectedTrack: selectedTrack?.id,
+    selectedCar: selectedCar?.id,
+    selectedSkin: selectedSkin?.id || 'default',
+    isRaceRunning: true,
+    isRaceFinished: false,
+    raceStartTime: Date.now(),
+  });
+  if (mode === 'timeTrial') updateMissionProgress('time_trial_played');
+  if (mode === 'ranked') updateMissionProgress('ranked_played');
   hideScreens();
+  currentScreen = 'game';
+  showRaceCanvas();
   setMobileControlsVisible(true);
+  initGameSceneOnce();
   const raceCar = { ...selectedCar, skin: selectedSkin };
   initGame(
     raceCar, selectedTrack,
@@ -193,10 +316,11 @@ function goToGame() {
 
 function goToResults(lapData) {
   trackEvent('game_over', { mode: selectedRaceOptions?.mode || selectedMode, score: _scoreFromLap(lapData?.lapMs), lap_ms: lapData?.lapMs });
-  currentScreen = 'results';
+  updateGameState({ currentScreen: 'results', isRaceRunning: false, isRaceFinished: true, raceEndTime: Date.now(), currentResult: lapData });
+  updateMissionProgress('race_finish');
   setMobileControlsVisible(false);
   stopGame();
-  showScreen('screen-results');
+  showScreen('result');
   initResults(
     lapData,
     { ...selectedCar, skin: selectedSkin },
@@ -211,6 +335,70 @@ function _scoreFromLap(lapMs) {
   return Math.max(0, Math.round(1000000 - Number(lapMs || 0) * 3));
 }
 
+function initGarageOnce() {
+  if (initFlags.garage) return;
+  console.time('initGarage');
+  initFlags.garage = true;
+  initCarSelect((car) => {
+    selectedCar = car;
+    selectCarAndSkin(car?.id, selectedSkin?.id || 'default');
+    goToSkinSelect();
+  });
+  console.timeEnd('initGarage');
+}
+
+function initLobbyOnce() {
+  if (initFlags.lobby) return;
+  initFlags.lobby = true;
+}
+
+function initGameSceneOnce() {
+  if (initFlags.gameScene) return;
+  console.time('initGameScene');
+  initFlags.gameScene = true;
+  console.timeEnd('initGameScene');
+}
+
+function initFullLeaderboardOnce() {
+  if (initFlags.fullLeaderboard) return;
+  initFlags.fullLeaderboard = true;
+  const trackFilter = document.getElementById('leaderboard-track-filter');
+  if (trackFilter && !trackFilter.options.length) {
+    trackFilter.innerHTML = TRACKS.map((track, idx) =>
+      `<option value="${track.id}"${idx === 0 ? ' selected' : ''}>${track.name}</option>`
+    ).join('');
+  }
+}
+
+function initHomeLeaderboardOnce() {
+  if (initFlags.homeLeaderboard) return;
+  initFlags.homeLeaderboard = true;
+  const trackFilter = document.getElementById('home-leaderboard-track');
+  if (!trackFilter) return;
+  trackFilter.innerHTML = TRACKS.map((track, idx) =>
+    `<option value="${track.id}"${idx === 0 ? ' selected' : ''}>${track.name}</option>`
+  ).join('');
+  trackFilter.addEventListener('change', () => _loadHomeLeaderboard());
+}
+
+async function fetchLeaderboardWithTimeout(type = 'today', mode = 'timeTrial', trackId = '', timeoutMs = 3000) {
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('leaderboard-timeout')), timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      trackId ? fetchLeaderboard(type, mode, 20, trackId) : fetchLeaderboard(type, mode, 20),
+      timeout,
+    ]);
+  } catch {
+    return { leaderboard: [] };
+  }
+}
+
+function renderLeaderboardEmptyState(container) {
+  if (container) container.innerHTML = '<li class="leaderboard-empty">No records yet</li>';
+}
+
 // ── game loop ────────────────────────────────────────────────
 function gameLoop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
@@ -223,7 +411,13 @@ function gameLoop(timestamp) {
   }
 
   clearFrameKeys();
-  requestAnimationFrame(gameLoop);
+  animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function startGameLoopOnce() {
+  if (isGameLoopRunning) return;
+  isGameLoopRunning = true;
+  animationFrameId = requestAnimationFrame(gameLoop);
 }
 
 // ── help button (always visible, opens controls modal) ──────
@@ -232,8 +426,11 @@ function _wireHelpButton() {
   const overlay = document.getElementById('help-overlay');
   const close = document.getElementById('btn-help-close');
   if (!btn || !overlay) return;
-  const open  = () => overlay.classList.remove('hidden');
-  const hide  = () => overlay.classList.add('hidden');
+  const open  = () => {
+    returnScreenAfterPanel = currentScreen || 'main';
+    showScreen('help');
+  };
+  const hide  = () => showScreen(returnScreenAfterPanel || 'main');
   btn.addEventListener('click', open);
   close && close.addEventListener('click', hide);
   overlay.addEventListener('click', e => {
@@ -241,7 +438,7 @@ function _wireHelpButton() {
   });
   // ESC closes if open (but only when overlay is the topmost UI)
   window.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !overlay.classList.contains('hidden')) {
+    if (e.key === 'Escape' && overlay.classList.contains('is-active')) {
       hide();
       e.stopPropagation();
     }
@@ -252,11 +449,25 @@ _wireHelpButton();
 function _wireMainMenu() {
   document.getElementById('btn-main-play')?.addEventListener('click', () => {
     trackEvent('guest_play_click', { source: 'main_menu' });
-    goToCarSelect();
+    goToModeSelect(() => goToMain());
   });
   document.getElementById('btn-main-login')?.addEventListener('click', () => {
     _openAuth();
   });
+  document.getElementById('btn-main-garage')?.addEventListener('click', () => {
+    goToCarSelect();
+  });
+  const openHelp = (event) => {
+    event?.preventDefault?.();
+    currentScreen = 'help';
+    showScreen('help');
+  };
+  document.getElementById('btn-main-help')?.addEventListener('click', openHelp);
+  document.getElementById('footer-help-link')?.addEventListener('click', openHelp);
+  document.getElementById('footer-about-link')?.addEventListener('click', openHelp);
+  document.getElementById('btn-help-back')?.addEventListener('click', () => goToMain());
+  document.getElementById('btn-auth-back')?.addEventListener('click', () => goToMain());
+  document.getElementById('btn-garage-back')?.addEventListener('click', () => goToMain());
   document.getElementById('btn-main-leaderboard')?.addEventListener('click', () => {
     _openLeaderboardOverlay();
   });
@@ -269,35 +480,44 @@ function _wireMainLeaderboardPreview() {
       _loadMainLeaderboardPreview();
     });
   });
-  _loadMainLeaderboardPreview();
 }
 
 async function _loadMainLeaderboardPreview(statusText = 'Loading racers...') {
+  if (mainLeaderboardPreviewPromise) return mainLeaderboardPreviewPromise;
   const list = document.getElementById('main-leaderboard-list');
   const status = document.getElementById('main-leaderboard-status');
   if (!list || !status) return;
+  initFlags.mainLeaderboardPreview = true;
   const activeTab = document.querySelector('.main-board-tab.active');
-  const boardType = activeTab?.dataset?.mainBoardType === 'all-time' ? 'allTime' : 'today';
-  status.textContent = boardType === 'today' ? statusText : 'All-time leaders';
+  const rawBoardType = activeTab?.dataset?.mainBoardType || 'today';
+  const boardType = rawBoardType === 'all-time' ? 'allTime' : rawBoardType === 'season' ? 'season' : 'today';
+  status.textContent = boardType === 'today' ? statusText : boardType === 'season' ? 'Season leaders' : 'All-time leaders';
   list.innerHTML = '<li class="leaderboard-empty">Loading leaderboard...</li>';
-  try {
-    const result = await fetchLeaderboard(boardType, 'timeTrial', 5);
+  mainLeaderboardPreviewPromise = (async () => { try {
+    const result = boardType === 'season'
+      ? await fetchSeasonLeaderboard('timeTrial', 5)
+      : await fetchLeaderboardWithTimeout(boardType, 'timeTrial', '', 3000);
     const rows = result.leaderboard?.slice(0, 5) || [];
     renderLeaderboardPreview(rows);
     status.textContent = rows.length
-      ? (boardType === 'today' ? 'Today Top 5' : 'All-time Top 5')
+      ? (boardType === 'today' ? 'Today Top 5' : boardType === 'season' ? 'Season Top 5' : 'All-time Top 5')
       : 'No records yet';
   } catch {
     renderLeaderboardPreview([]);
     status.textContent = 'No records yet';
-  }
+  } finally {
+    mainLeaderboardPreviewPromise = null;
+  } })();
+  return mainLeaderboardPreviewPromise;
 }
 
 function _openLeaderboardOverlay() {
   const overlay = document.getElementById('leaderboard-overlay');
   if (!overlay) return;
-  overlay.classList.remove('hidden');
-  trackEvent('leaderboard_open', { source: currentScreen });
+  returnScreenAfterPanel = currentScreen || 'main';
+  initFullLeaderboardOnce();
+  showScreen('leaderboard');
+  trackEvent('leaderboard_open', { source: returnScreenAfterPanel });
   _loadGlobalLeaderboard();
 }
 
@@ -309,15 +529,10 @@ function _wireGlobalLeaderboard() {
   const trackFilter = document.getElementById('leaderboard-track-filter');
   if (!openBtn || !overlay) return;
 
-  if (trackFilter) {
-    trackFilter.innerHTML = TRACKS.map((track, idx) =>
-      `<option value="${track.id}"${idx === 0 ? ' selected' : ''}>${track.name}</option>`
-    ).join('');
-    trackFilter.addEventListener('change', () => _loadGlobalLeaderboard());
-  }
+  if (trackFilter) trackFilter.addEventListener('change', () => _loadGlobalLeaderboard());
 
   const open = () => _openLeaderboardOverlay();
-  const close = () => overlay.classList.add('hidden');
+  const close = () => showScreen(returnScreenAfterPanel || 'main');
 
   openBtn.addEventListener('click', open);
   closeBtn && closeBtn.addEventListener('click', close);
@@ -340,70 +555,52 @@ function _wireGlobalLeaderboard() {
   });
 
   subscribeLeaderboard(() => {
-    if (!overlay.classList.contains('hidden')) _loadGlobalLeaderboard('실시간 갱신됨');
-    _loadHomeLeaderboard('실시간 갱신됨');
+    if (overlay.classList.contains('is-active')) _loadGlobalLeaderboard('Live update');
+    if (initFlags.homeLeaderboard) _loadHomeLeaderboard('Live update');
   });
 }
 
-async function _loadGlobalLeaderboard(statusText = '서버 연결 중...') {
+async function _loadGlobalLeaderboard(statusText = 'Loading leaderboard...') {
   const list = document.getElementById('global-leaderboard-list');
   const status = document.getElementById('global-leaderboard-status');
   const trackFilter = document.getElementById('leaderboard-track-filter');
   if (!list || !status) return;
   const activeTab = document.querySelector('.leaderboard-tab.active');
-  const boardType = activeTab?.dataset?.boardType === 'today' ? 'today' : 'allTime';
+  const rawBoardType = activeTab?.dataset?.boardType || 'all-time';
+  const boardType = rawBoardType === 'today' ? 'today' : rawBoardType === 'season' ? 'season' : 'allTime';
   status.textContent = statusText;
   list.innerHTML = '<li class="leaderboard-empty">Loading leaderboard...</li>';
   try {
-    const result = await fetchLeaderboard(boardType, 'timeTrial', 20);
+    const result = boardType === 'season'
+      ? await fetchSeasonLeaderboard('timeTrial', 20)
+      : await fetchLeaderboardWithTimeout(boardType, 'timeTrial', '', 3000);
     _renderGlobalLeaderboard(result.leaderboard || []);
-    status.textContent = result.leaderboard?.length ? `${boardType === 'today' ? 'Today' : 'All-time'} TOP 20` : 'No records yet';
+    status.textContent = result.leaderboard?.length ? `${boardType === 'today' ? 'Today' : boardType === 'season' ? 'Season' : 'All-time'} TOP 20` : 'No records yet';
   } catch {
     list.innerHTML = '<li class="leaderboard-empty">No records yet</li>';
     status.textContent = 'No records yet';
   }
-  return;
-  const trackId = trackFilter?.value || TRACKS[0]?.id || '';
-  const trackName = TRACKS.find(t => t.id === trackId)?.name || '선택 맵';
-
-  status.textContent = `${trackName} ${statusText}`;
-  list.innerHTML = '<li class="leaderboard-empty">랭킹을 불러오는 중...</li>';
-
-  try {
-    const result = await fetchLeaderboard('', trackId, 20);
-    _renderGlobalLeaderboard(result.leaderboard || []);
-    status.textContent = result.leaderboard?.length ? `${trackName} TOP 20` : `${trackName} 등록된 기록이 없습니다.`;
-  } catch {
-    list.innerHTML = '<li class="leaderboard-empty">서버에 연결할 수 없습니다.</li>';
-    status.textContent = '온라인 랭킹 서버를 확인하세요.';
-  }
 }
 
 function _wireHomeLeaderboard() {
-  const trackFilter = document.getElementById('home-leaderboard-track');
-  if (!trackFilter) return;
-  trackFilter.innerHTML = TRACKS.map((track, idx) =>
-    `<option value="${track.id}"${idx === 0 ? ' selected' : ''}>${track.name}</option>`
-  ).join('');
-  trackFilter.addEventListener('change', () => _loadHomeLeaderboard());
-  _loadHomeLeaderboard();
+  initHomeLeaderboardOnce();
 }
 
-async function _loadHomeLeaderboard(statusText = '서버 연결 중...') {
+async function _loadHomeLeaderboard(statusText = 'Loading leaderboard...') {
   const list = document.getElementById('home-leaderboard-list');
   const status = document.getElementById('home-leaderboard-status');
   const trackFilter = document.getElementById('home-leaderboard-track');
   if (!list || !status || !trackFilter) return;
   const trackId = trackFilter.value || TRACKS[0]?.id || '';
   status.textContent = statusText;
-  list.innerHTML = '<li class="leaderboard-empty">랭킹을 불러오는 중...</li>';
+  list.innerHTML = '<li class="leaderboard-empty">Loading leaderboard...</li>';
   try {
     const result = await fetchLeaderboard('', trackId, 8);
     _renderLeaderboardInto(list, result.leaderboard || []);
-    status.textContent = result.leaderboard?.length ? '맵별 TOP 8' : '아직 기록 없음';
+    status.textContent = result.leaderboard?.length ? 'Track TOP 8' : 'No records yet';
   } catch {
-    list.innerHTML = '<li class="leaderboard-empty">서버에 연결할 수 없습니다.</li>';
-    status.textContent = 'Supabase 연결 확인 필요';
+    list.innerHTML = '<li class="leaderboard-empty">No records yet</li>';
+    status.textContent = 'Leaderboard service is unavailable.';
   }
 }
 
@@ -427,7 +624,7 @@ function _renderLeaderboardInto(list, rows) {
   list.innerHTML = '';
 
   if (rows.length === 0) {
-    list.innerHTML = '<li class="leaderboard-empty">아직 등록된 기록이 없습니다.</li>';
+    renderLeaderboardEmptyState(list);
     return;
   }
 
@@ -439,7 +636,7 @@ function _renderLeaderboardInto(list, rows) {
 
     const rank = document.createElement('span');
     rank.className = 'leaderboard-rank';
-    rank.textContent = row.rank === 1 ? '♛ 1' : String(row.rank);
+    rank.textContent = row.rank === 1 ? '#1' : String(row.rank);
 
     const main = document.createElement('span');
     main.className = 'global-leaderboard-main';
@@ -474,7 +671,7 @@ function _wireProfilePanel() {
   const save = document.getElementById('btn-profile-save');
   if (!openBtn || !panel) return;
 
-  openBtn.addEventListener('click', () => panel.classList.toggle('hidden'));
+  openBtn.addEventListener('click', () => goToCarSelect());
   closeBtn?.addEventListener('click', () => panel.classList.add('hidden'));
   logout && (logout.onclick = async () => {
     await signOut();
@@ -501,6 +698,7 @@ function _wireProfilePanel() {
 }
 
 function _renderProfilePanel() {
+  queueMicrotask(_renderRatingBadgeInProfile);
   const user = getCurrentUser();
   const profile = getProfile();
   const local = getPlayerProfile();
@@ -535,6 +733,18 @@ function _renderProfilePanel() {
     : '게스트는 기본 차량만 사용할 수 있습니다.';
   if (logout) logout.classList.toggle('hidden', !user);
   if (status) status.textContent = user ? `${user.id} 로그인됨` : '로그인하면 코인과 차량을 저장합니다.';
+}
+
+function _renderRatingBadgeInProfile() {
+  const ratingEl = document.getElementById('profile-rating-badge') || (() => {
+    const panel = document.getElementById('profile-panel');
+    const el = document.createElement('div');
+    el.id = 'profile-rating-badge';
+    el.className = 'profile-rating-wrap';
+    panel?.appendChild(el);
+    return el;
+  })();
+  if (ratingEl) ratingEl.innerHTML = renderRatingBadge(getRating());
 }
 
 function _authErrorMessage(error) {
@@ -661,7 +871,7 @@ function _wireStarterRewardPack() {
 }
 
 function setLeaderboardTab(type) {
-  const normalized = type === 'today' ? 'today' : 'all-time';
+  const normalized = type === 'today' ? 'today' : type === 'season' ? 'season' : 'all-time';
   document.querySelectorAll('.leaderboard-tab').forEach(item => {
     item.classList.toggle('active', item.dataset.boardType === normalized);
   });
@@ -670,12 +880,14 @@ function setLeaderboardTab(type) {
 
 function _openStarterRewardPack() {
   const overlay = document.getElementById('starter-reward-overlay');
-  if (overlay) overlay.classList.remove('hidden');
+  if (overlay) {
+    returnScreenAfterPanel = currentScreen || 'main';
+    showScreen('bonusDraw');
+  }
 }
 
 function _closeStarterRewardPack() {
-  const overlay = document.getElementById('starter-reward-overlay');
-  if (overlay) overlay.classList.add('hidden');
+  showScreen(returnScreenAfterPanel || 'main');
 }
 
 const recentToastKeys = new Map();
@@ -726,16 +938,26 @@ function _escape(value) {
   ));
 }
 
+function normalizeStaticScreenCopy() {
+  const modeTitle = document.querySelector('#screen-modeselect .screen-header h1');
+  const modeSubtitle = document.querySelector('#screen-modeselect .screen-header .subtitle');
+  const lobbyTitle = document.querySelector('#screen-lobby .screen-header h1');
+  if (modeTitle) modeTitle.textContent = 'Game Mode Select';
+  if (modeSubtitle) modeSubtitle.textContent = 'Choose ranked, time trial, or friendly racing.';
+  if (lobbyTitle) lobbyTitle.textContent = 'Race Lobby';
+}
+
+console.time('initial-load');
 initAnalytics();
 clearRaceRecordsOnce();
 initMobileControls();
 initAds();
+normalizeStaticScreenCopy();
 _wireMainMenu();
 _wireMainLeaderboardPreview();
 _wireAuthScreen();
 _wireProfilePanel();
 _wireStarterRewardPack();
-_wireHomeLeaderboard();
 _wireGlobalLeaderboard();
 _wireGlobalCompletionToast();
 await initAuth();
@@ -747,4 +969,5 @@ onAuthChange(() => {
 
 // ── start ────────────────────────────────────────────────────
 goToMain();
-requestAnimationFrame(gameLoop);
+startGameLoopOnce();
+console.timeEnd('initial-load');

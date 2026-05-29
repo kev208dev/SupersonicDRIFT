@@ -11,6 +11,11 @@ import { getBestLap } from '../utils/storage.js';
 import { showBannerAd, showRewardedAd } from '../js/ads.js';
 import { trackEvent } from '../js/analytics.js';
 import { shareResult } from '../js/share.js';
+import { getCurrentSeason } from '../js/seasons.js';
+import { applyRankedResult, getRating } from '../js/rating.js';
+import { updateMissionProgress, renderMissionPanel } from '../js/missions.js';
+import { checkUnlockConditions } from '../js/unlocks.js';
+import { stopGhostRecording } from '../js/ghost.js';
 
 let unsubscribeLeaderboard = null;
 let renderToken = 0;
@@ -24,19 +29,11 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
   const score = scoreFromLap(data?.lapMs);
   resultSubmitted = false;
 
-  currentResult = {
-    nickname: getPlayerProfile().name || getGuestNickname(),
-    mode,
-    finishTime: Math.round(Number(data?.lapMs || 0)),
-    score,
-    ratingChange: mode === 'ranked' ? Math.max(1, Math.round(score / 10000)) : 0,
-    track,
-    car,
-    sectors: data?.sectors || [],
-    completedAt: new Date().toISOString(),
-    isGuest: true,
-    formattedTime: formatTime(data?.lapMs || 0),
-  };
+  currentResult = buildFinishResult({ data, car, track, mode, score });
+  if (mode === 'ranked') {
+    currentResult = applyRankedResult({ ...currentResult, placement: data?.placement || 1, playerCount: data?.playerCount || 2 });
+  }
+  handleRaceFinish(currentResult, data);
   sessionStorage.setItem('last_racing_score', String(score));
 
   setText('res-title', data?.isNew ? 'Finish! New Record' : 'Finish!');
@@ -53,13 +50,14 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
   const listEl = document.getElementById('leaderboard-list');
   const statusEl = document.getElementById('leaderboard-status');
   renderLeaderboard(listEl, null);
-  setStatus(statusEl, 'Saving record...');
-  setStatus(statusEl, 'Submit Score를 눌러 기록을 저장하세요.');
-  loadResultLeaderboard({ mode, token, listEl, statusEl });
+  setStatus(statusEl, shouldSaveOfficialRecord(mode)
+    ? 'Saving official Time Trial record...'
+    : `${modeLabel(mode)} result only - official records are saved in Time Trial.`);
+  loadResultLeaderboard({ mode: 'timeTrial', token, listEl, statusEl });
   unsubscribeLeaderboard = subscribeLeaderboard(payload => {
     if (token !== renderToken) return;
     if (payload.trackId && track?.id && payload.trackId !== track.id) return;
-    loadResultLeaderboard({ mode, token, listEl, statusEl, statusText: 'Live update' });
+    loadResultLeaderboard({ mode: 'timeTrial', token, listEl, statusEl, statusText: 'Live update' });
   });
 
   const retryBtn = document.getElementById('btn-retry');
@@ -69,14 +67,14 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
   const shareBtn = document.getElementById('btn-share-score');
   const rewardedBtn = document.getElementById('btn-rewarded-continue');
 
-  if (retryBtn) retryBtn.textContent = 'Retry';
-  if (menuBtn) menuBtn.textContent = 'Main Menu';
+  if (retryBtn) retryBtn.textContent = mode === 'timeTrial' ? 'Retry' : mode === 'friendly' ? 'Rematch' : 'Match Again';
+  if (menuBtn) menuBtn.textContent = mode === 'friendly' ? 'Back to Room' : 'Main Menu';
   if (retryBtn) retryBtn.onclick = () => { cleanupLeaderboard(); retryCb?.(); };
   if (menuBtn) menuBtn.onclick = () => { cleanupLeaderboard(); menuCb?.(); };
   if (leaderboardBtn) leaderboardBtn.onclick = () => document.getElementById('btn-open-leaderboard')?.click();
   if (submitBtn) {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Retry Save';
+    submitBtn.disabled = !shouldSaveOfficialRecord(mode);
+    submitBtn.textContent = shouldSaveOfficialRecord(mode) ? 'Retry Save' : 'Time Trial Only';
     submitBtn.onclick = () => submitCurrentResult({ submitBtn, statusEl, listEl, mode });
   }
   if (shareBtn) {
@@ -94,6 +92,34 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
   }
   showBannerAd('ad-game-over-banner');
   submitCurrentResult({ submitBtn, statusEl, listEl, mode, auto: true });
+}
+
+export function buildFinishResult({ data, car, track, mode, score }) {
+  return {
+    nickname: getPlayerProfile().name || getGuestNickname(),
+    mode,
+    finishTime: Math.round(Number(data?.lapMs || 0)),
+    score,
+    ratingChange: mode === 'ranked' ? Math.max(1, Math.round(score / 10000)) : 0,
+    track,
+    car,
+    sectors: data?.sectors || [],
+    completedAt: new Date().toISOString(),
+    seasonId: getCurrentSeason().id,
+    ratingBefore: getRating(),
+    isGuest: true,
+    formattedTime: formatTime(data?.lapMs || 0),
+  };
+}
+
+export function handleRaceFinish(result, data = {}) {
+  stopGhostRecording(result);
+  updateMissionProgress('race_finish');
+  if (data?.isNew) updateMissionProgress('new_record');
+  const finished = Number(localStorage.getItem('racingFinishedRaces') || 0) + 1;
+  localStorage.setItem('racingFinishedRaces', String(finished));
+  checkUnlockConditions({ finishedRaces: finished });
+  renderMissionPanel();
 }
 
 function cleanupLeaderboard() {
@@ -121,16 +147,17 @@ async function loadResultLeaderboard({ mode, token, listEl, statusEl, statusText
 
 async function submitCurrentResult({ submitBtn, statusEl, listEl, mode, auto = false }) {
   if (!currentResult) return setStatus(statusEl, 'No result to submit yet');
+  if (!shouldSaveOfficialRecord(mode)) return setStatus(statusEl, `${modeLabel(mode)} result only - official records are saved in Time Trial.`);
   if (resultSubmitted) return setStatus(statusEl, 'Record already saved');
   if (submitBtn) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Saving...';
   }
   try {
-    const result = await submitResultRecord(currentResult);
+    const result = await submitOfficialTimeTrialRecord(currentResult);
     resultSubmitted = true;
     renderLeaderboard(listEl, result.leaderboard || []);
-    setStatus(statusEl, result.onlineSaved ? 'Record saved to leaderboard' : 'Online save failed. Saved locally.');
+    setStatus(statusEl, result.onlineSaved ? 'Record saved' : 'Online save failed. Saved locally.');
     if (submitBtn) submitBtn.textContent = 'Saved';
   } catch {
     resultSubmitted = false;
@@ -139,6 +166,26 @@ async function submitCurrentResult({ submitBtn, statusEl, listEl, mode, auto = f
   } finally {
     if (submitBtn && !resultSubmitted) submitBtn.textContent = 'Retry Save';
   }
+}
+
+export function shouldSaveOfficialRecord(mode) {
+  return isTimeTrialMode(mode);
+}
+
+export function isOnlineMode(mode) {
+  return mode === 'friendly' || mode === 'ranked';
+}
+
+export function isFriendlyMode(mode) {
+  return mode === 'friendly';
+}
+
+export function isTimeTrialMode(mode) {
+  return normalizeMode(mode) === 'timeTrial';
+}
+
+export function submitOfficialTimeTrialRecord(result) {
+  return submitResultRecord({ ...result, mode: 'timeTrial' });
 }
 
 function renderSectors(data) {
@@ -176,7 +223,7 @@ function renderLeaderboard(listEl, rows) {
     name.className = 'leaderboard-driver';
     name.textContent = row.playerName || row.nickname || 'Driver';
     const time = document.createElement('span');
-    time.className = 'leaderboard-time';
+    time.className = 'leaderboard-time ui-highlight-record';
     time.textContent = formatTime(row.finishTime || row.lapMs || 0);
     li.append(rank, name, time);
     listEl.appendChild(li);

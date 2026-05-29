@@ -86,6 +86,9 @@ function _wireOnce() {
   window.addEventListener('racing:userProfileChange', () => {
     if (currentRoom) _renderRoom(currentRoom);
   });
+  document.querySelectorAll('[data-lobby-emote]').forEach(btn => {
+    btn.addEventListener('click', () => sendLobbyEmote(btn.dataset.lobbyEmote));
+  });
 
   document.getElementById('lobby-room-track-select')?.addEventListener('change', (e) => {
     if (!currentRoom || currentRoom.hostId !== myClientId) return;
@@ -164,7 +167,7 @@ function _updateConnState(online) {
   const el = document.getElementById('lobby-conn-state');
   if (!el) return;
   el.classList.toggle('online', !!online);
-  el.classList.toggle('offline', !online);
+  el.classList.toggle('disconnected', !online);
   el.textContent = online ? '서버와 연결됨' : '서버 연결 끊김 — 재연결 중...';
 }
 
@@ -246,6 +249,7 @@ function _renderTabs() {
 }
 
 function _renderRoom(room) {
+  renderLobbyScreen(selectedCar?.mode || (room?.isPrivate ? 'friendly' : 'ranked'), room);
   const pane = document.getElementById('lobby-room-pane');
   if (!pane) return;
   if (!room) {
@@ -359,6 +363,60 @@ export function renderLobbyMapPreview(room) {
       </div>
     </div>
   `;
+}
+
+export function renderLobbyScreen(mode, room) {
+  renderLobbyTips();
+  if (room) renderLobbyPlayerCards(room.players || []);
+  return { mode, room };
+}
+
+export function renderMapPreview(trackId) {
+  return renderLobbyMapPreview({ trackId, lapTarget: 3 });
+}
+
+export function renderLobbyPlayerCards(players = []) {
+  return players;
+}
+
+export function renderLobbyTips(target = document.getElementById('lobby-room-status')) {
+  if (!target) return;
+  const tips = [
+    'Drift before tight corners to keep speed.',
+    'Use Boost on straight roads.',
+    'Double Drift can save sharp turns.',
+    'Season ranking resets every month.',
+  ];
+  const tip = tips[Math.floor(Date.now() / 5000) % tips.length];
+  target.dataset.tip = tip;
+}
+
+export function sendLobbyEmote(emote) {
+  renderLobbyEmoteFeed(emote);
+}
+
+export function renderLobbyEmoteFeed(emote = '') {
+  let feed = document.getElementById('lobby-emote-feed');
+  if (!feed) {
+    feed = document.createElement('div');
+    feed.id = 'lobby-emote-feed';
+    feed.className = 'lobby-emote-feed';
+    document.getElementById('lobby-room-pane')?.appendChild(feed);
+  }
+  if (emote) {
+    const item = document.createElement('span');
+    item.textContent = emote;
+    feed.appendChild(item);
+    while (feed.children.length > 5) feed.firstElementChild?.remove();
+  } else if (!feed.children.length) {
+    ['🔥', '⚡', '👑', '😎', '🏁'].forEach(symbol => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = symbol;
+      btn.addEventListener('click', () => sendLobbyEmote(symbol));
+      feed.appendChild(btn);
+    });
+  }
 }
 
 function _copyRoomCode() {

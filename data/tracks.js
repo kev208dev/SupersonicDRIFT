@@ -1,4 +1,4 @@
-// Official f1-circuits.com based traces.
+﻿// Official f1-circuits.com based traces.
 // Coordinates are hand-traced from each linked circuit hero map in its original
 // image orientation. No mirroring or reshaping is applied.
 
@@ -106,13 +106,14 @@ function makeOfficialCircuit({
   info = {},
 }) {
   const center = buildSourceCenterline(trace, sourceSize, scale);
-  const { outer, inner } = offsetWalls(center, width);
+  const raceWidth = Math.round(width * 1.65);
+  const { outer, inner } = offsetWalls(center, raceWidth);
 
   const N = center.length;
   const sc = center[0];
   const scNext = center[1];
   const sAngle = Math.atan2(scNext.y - sc.y, scNext.x - sc.x);
-  const halfW = width * 0.58;
+  const halfW = raceWidth * 0.58;
   const perpDx = -Math.sin(sAngle);
   const perpDy = Math.cos(sAngle);
   const approxStep = avgStep(center);
@@ -155,7 +156,10 @@ function makeOfficialCircuit({
     difficulty,
     desc,
     character,
-    width,
+    width: raceWidth,
+    targetTime: info.targetTime || estimateTargetTimeMs(length, difficulty),
+    silverTime: info.silverTime || Math.round((info.targetTime || estimateTargetTimeMs(length, difficulty)) * 0.92),
+    goldTime: info.goldTime || Math.round((info.targetTime || estimateTargetTimeMs(length, difficulty)) * 0.84),
     outerBoundary: outer,
     innerBoundary: inner,
     centerLine: center.map(c => [c.x, c.y]),
@@ -169,6 +173,17 @@ function makeOfficialCircuit({
     sourceSize,
     ...info,
   };
+}
+
+function estimateTargetTimeMs(length, difficulty = '') {
+  const km = Number.parseFloat(String(length).replace(/[^\d.]/g, '')) || 4.5;
+  const difficultyText = String(difficulty).toLowerCase();
+  const difficultyMult = difficultyText.includes('hard') || difficultyText.includes('어려')
+    ? 1.18
+    : difficultyText.includes('very') || difficultyText.includes('expert') || difficultyText.includes('매우')
+      ? 1.32
+      : 1;
+  return Math.round(km * 13500 * difficultyMult);
 }
 
 function avgStep(center) {
@@ -186,9 +201,9 @@ export const TRACKS = [
     id: 'autodromo_hermanos_rodriguez',
     name: 'Autodromo Hermanos Rodriguez',
     length: '4.304 km',
-    difficulty: '보통',
-    desc: 'Mexico City Grand Prix 공식 페이지 맵 방향 그대로 적용',
-    character: '긴 메인 스트레이트 + Foro Sol 스타디움 섹션',
+    difficulty: 'Normal',
+    desc: 'A wide, fast technical circuit inspired by Mexico City Grand Prix rhythm.',
+    character: 'Long main straight, stadium section, and medium-speed technical corners.',
     width: 138,
     scale: 3.0,
     startBackOffset: 150,
@@ -221,9 +236,9 @@ export const TRACKS = [
     id: 'pacifica_sweep',
     name: 'Pacifica Sweep GP',
     length: '5.840 km',
-    difficulty: '보통',
-    desc: '1번 트랙처럼 넓고 읽기 쉬운 고속 밸런스 서킷',
-    character: '긴 직선 2개 + 크게 말리는 중속 코너 + 안정적인 탈출 구간',
+    difficulty: 'Normal',
+    desc: 'A flowing coastal speed course with generous racing width.',
+    character: 'Two long straights, sweeping bends, and stable exit zones.',
     width: 152,
     scale: 2.85,
     startBackOffset: 190,
@@ -255,9 +270,9 @@ export const TRACKS = [
     id: 'pylon_p_loop',
     name: 'Pylon P-Loop',
     length: '4.920 km',
-    difficulty: '어려움',
-    desc: 'P자 도로 형태의 브레이킹/재가속 집중 코스',
-    character: '긴 세로 스템 + 둥근 P 루프 + 안쪽 타이트 섹션',
+    difficulty: 'Hard',
+    desc: 'A P-shaped braking and rotation challenge for precise drivers.',
+    character: 'Long entry, tight P loop, and a late technical sector.',
     width: 142,
     scale: 2.95,
     startBackOffset: 210,
@@ -288,9 +303,9 @@ export const TRACKS = [
     id: 'monaco_street',
     name: 'Circuit de Monaco',
     length: '3.337 km',
-    difficulty: '매우 어려움',
-    desc: 'Monte Carlo 도심을 막아 만든 좁고 까다로운 거리 서킷',
-    character: '카지노 광장 + 그랑 호텔 헤어핀 + 터널 + 수영장 섹션',
+    difficulty: 'Very Hard',
+    desc: 'A compact street circuit with demanding precision and rhythm.',
+    character: 'Square turns, hairpins, tunnel-style flow, and fast pool-side chicanes.',
     width: 128,
     scale: 2.85,
     startBackOffset: 180,
@@ -323,9 +338,9 @@ export const TRACKS = [
     id: 'monza_temple',
     name: 'Autodromo Nazionale Monza',
     length: '5.793 km',
-    difficulty: '쉬움',
-    desc: 'Ferrari의 홈, 초고속 직선과 시케인의 속도 성지',
-    character: '긴 메인 스트레이트 + 3개 시케인 + 파라볼리카',
+    difficulty: 'Easy',
+    desc: 'A temple of speed built around long straights and clean braking zones.',
+    character: 'Main straight, three chicanes, Curva Grande, and Parabolica.',
     width: 152,
     scale: 2.75,
     startBackOffset: 240,
@@ -359,9 +374,9 @@ export const TRACKS = [
     id: 'aurora_endurance',
     name: 'Aurora Endurance',
     length: '11.620 km',
-    difficulty: '매우 어려움',
-    desc: '기존 맵보다 약 두 배 긴 장거리 변수형 서킷',
-    character: '초장거리 직선 + 연속 S 코너 + 고저차 리듬 + 마지막 헤어핀',
+    difficulty: 'Very Hard',
+    desc: 'A long endurance route with high-speed rhythm changes.',
+    character: 'Extended straights, linked esses, elevation rhythm, and a final hairpin.',
     width: 150,
     scale: 4.15,
     startBackOffset: 120,
@@ -392,3 +407,4 @@ export const TRACKS = [
     ],
   }),
 ];
+

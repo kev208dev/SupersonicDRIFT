@@ -19,6 +19,9 @@ import {
 import { scatterProps, updateScenery } from '../js/scenery.js';
 import { awardMissions, recordTrackPlay } from '../utils/profile.js';
 import { CAR_DATA } from '../data/cars.js';
+import { initMiniMap, updateMiniMap } from '../js/minimap.js';
+import { startRecordLineCapture, captureRecordLineSample, loadBestRecordLine, renderRecordLine } from '../js/ghost.js';
+import { updateMissionProgress } from '../js/missions.js';
 
 // ── Three.js renderer (persists across retries) ──────────────
 let renderer = null;
@@ -63,6 +66,7 @@ let bestGhost = null;
 let resultsTimeout = null;
 let raceOptions = {};
 let lapStats = null;
+const START_DELAY_MS = 1000;
 
 // fixed-step physics
 const FIXED_DT  = 1 / 60;
@@ -84,11 +88,11 @@ export function initGame(cd, tr, resultsCb, menuCb, options = {}) {
   accumulator = 0;
   cameraMode  = 'chase';
   lastWallHitId = 0;
-  startCountdown = 3.2;
-  startReadyAt = performance.now() + 3200;
+  startCountdown = 3.2 + START_DELAY_MS / 1000;
+  startReadyAt = performance.now() + 3200 + START_DELAY_MS;
   raceReleased = false;
   lapPath = [];
-  bestGhost = raceOptions.ghostEnabled ? getBestGhost(tr.id) : null;
+  bestGhost = raceOptions.ghostEnabled ? loadBestRecordLine(tr.id) || getBestGhost(tr.id) : null;
   lapStats = _makeLapStats();
   try {
     recordTrackPlay(tr.id);
@@ -163,6 +167,7 @@ export function initGame(cd, tr, resultsCb, menuCb, options = {}) {
 
   // ── track ──
   getTrackGroup(track, scene);
+  if ((raceOptions.mode || 'timeTrial') === 'timeTrial' && bestGhost) renderRecordLine(bestGhost, scene);
 
   // ── scenery (mountains, trees, billboards, pit garages, etc) ──
   propsGroup = scatterProps(scene, track);
@@ -172,7 +177,7 @@ export function initGame(cd, tr, resultsCb, menuCb, options = {}) {
   carMesh = createCar3D(cd);
   scene.add(carMesh);
   updateCar3D(carMesh, car, { brake: 0 });
-  ghostMesh = _createGhostMesh(bestGhost);
+  ghostMesh = null;
 
   // ── effects ──
   smokePool  = createSmokePool(scene, 48);
@@ -236,6 +241,8 @@ export function updateGame(dt, now) {
     startRaceTimer(now);
     lapStats = _makeLapStats();
   }
+  initMiniMap(tr);
+  if ((raceOptions.mode || 'timeTrial') === 'timeTrial') startRecordLineCapture(tr.id, cd.id);
   const driveInput = raceReleased ? input : {
     ...input,
     throttle: 0, brake: 0, steer: 0, handbrake: false,
@@ -247,6 +254,9 @@ export function updateGame(dt, now) {
   let steps = 0;
   while (accumulator >= FIXED_DT && steps < 5) {
     updatePhysics(car, driveInput, FIXED_DT, track);
+    if (raceReleased && car?.drifting) updateMissionProgress('drift_second', FIXED_DT);
+    if (raceReleased && driveInput.boostJust) updateMissionProgress('boost_used');
+    if (raceReleased && (raceOptions.mode || 'timeTrial') === 'timeTrial') captureRecordLineSample(FIXED_DT, car);
     if (raceReleased && lapStats) {
       if (driveInput.throttle > 0) lapStats.throttleUsed = true;
       lapStats.maxSpeed = Math.max(lapStats.maxSpeed, car.speed * KMH_PER_UNIT);
@@ -318,6 +328,7 @@ export function updateGame(dt, now) {
 
   // ── render ──
   renderer.render(scene, camera3d);
+  updateMiniMap({ x: car.x, y: car.y });
   _renderHUD(dt, kmh);
 }
 
@@ -483,8 +494,8 @@ export function restartRaceWithCountdown() {
 }
 
 export function showStartLights() {
-  startReadyAt = performance.now() + 3200;
-  startCountdown = 3.2;
+  startReadyAt = performance.now() + 3200 + START_DELAY_MS;
+  startCountdown = 3.2 + START_DELAY_MS / 1000;
 }
 
 export function lockRaceInput() {
@@ -502,6 +513,12 @@ export function resetRaceState() {
 export function startRaceTimer(now = performance.now()) {
   if (!timing) timing = createTiming(getBestSectors(track.id));
   if (!timing.started) startTiming(timing, now);
+}
+
+export function startRaceTimerAfterDelay(delayMs = START_DELAY_MS) {
+  startReadyAt = performance.now() + Number(delayMs || 0);
+  startCountdown = Math.max(0, Number(delayMs || 0) / 1000);
+  lockRaceInput();
 }
 
 // ── chase camera (framerate-independent smoothing) ──────────
@@ -707,8 +724,8 @@ function _resetCar() {
   // Re-create timing so the countdown releases into a clean lap.
   timing = createTiming(getBestSectors(track.id));
   lapPath = [];
-  startCountdown = 3.2;
-  startReadyAt = performance.now() + 3200;
+  startCountdown = 3.2 + START_DELAY_MS / 1000;
+  startReadyAt = performance.now() + 3200 + START_DELAY_MS;
   raceReleased = false;
   lapStats = _makeLapStats();
   lapBannerTimer = 0;
