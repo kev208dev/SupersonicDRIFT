@@ -126,6 +126,9 @@
               </button>
               <button class="lobby-mode-card" id="btn-main-leaderboard" type="button">랭킹</button>
               <button class="lobby-mode-card" id="btn-lobby-shop" type="button">상점 / 뽑기</button>
+              <div id="ad-lobby-side" class="ad-placeholder ad-lobby-side">
+                <span>Advertisement</span><small>Ad Space</small>
+              </div>
             </aside>
 
             <div class="lobby-car-toast" id="lobby-car-toast" aria-live="polite"></div>
@@ -149,8 +152,8 @@
             </section>
             <section id="season-panel" class="season-panel lobby-mini-panel"></section>
             <section id="mission-panel" class="mission-panel lobby-mini-panel"></section>
-            <div class="lobby-control-hint">WASD/방향키 주행 · Space/Enter 드리프트 · Shift 부스트 · R 리스폰 · 맵 전환 버튼으로 점프코스 전환 · ESC 패널 숨김</div>
-            <div id="ad-main-menu-banner" class="ad-placeholder lobby-ad-hidden">
+            <div class="lobby-control-hint">WASD/방향키 주행 · Space 드리프트 · Enter/E 더블드리프트 · Shift 부스트 · R 리스폰 · 맵 전환으로 점프코스 전환 · ESC 패널 숨김</div>
+            <div id="ad-main-menu-banner" class="ad-placeholder">
               <span>Advertisement</span><small>Ad Space</small>
             </div>
           </div>
@@ -627,25 +630,40 @@
 
     <div id="help-overlay" class="screen" data-screen="help" aria-hidden="true">
       <div class="help-box">
-        <h2>Controls</h2>
-        <table class="help-table">
-          <tr><td><kbd>W</kbd> / <kbd>Arrow Up</kbd></td><td>Accelerate</td></tr>
-          <tr><td><kbd>S</kbd> / <kbd>Arrow Down</kbd></td><td>Brake / Reverse</td></tr>
-          <tr><td><kbd>A</kbd> / <kbd>D</kbd></td><td>Steer left / right</td></tr>
-          <tr><td><kbd>SPACE</kbd> / <kbd>ENTER</kbd></td><td>Hold to drift through corners</td></tr>
-          <tr><td><kbd>E</kbd></td><td>Double Drift for a sharper chained turn</td></tr>
-          <tr><td><kbd>SHIFT</kbd></td><td>Boost on straight roads</td></tr>
-          <tr><td><kbd>R</kbd></td><td>Restart with countdown</td></tr>
-          <tr><td><kbd>C</kbd></td><td>Switch camera</td></tr>
-          <tr><td><kbd>ESC</kbd></td><td>Return to menu</td></tr>
-        </table>
-        <h3>Mobile</h3>
-        <ul class="help-list">
-          <li>Joystick steers the car. Acceleration is automatic on mobile.</li>
-          <li>Use Drift, Double Drift, and Boost buttons during the race.</li>
-          <li>Official records are saved only in Time Trial.</li>
-        </ul>
-        <button class="btn-primary" id="btn-help-close">Close</button>
+        <h2 class="help-title">조작법 가이드</h2>
+        <div class="help-grid">
+          <div class="help-card">
+            <div class="help-card-icon">🚗</div>
+            <div class="help-card-label">주행</div>
+            <div class="help-key-row"><kbd>W</kbd><kbd>↑</kbd> 가속</div>
+            <div class="help-key-row"><kbd>S</kbd><kbd>↓</kbd> 브레이크</div>
+            <div class="help-key-row"><kbd>A</kbd><kbd>D</kbd> 좌우 조향</div>
+          </div>
+          <div class="help-card">
+            <div class="help-card-icon">🌀</div>
+            <div class="help-card-label">드리프트</div>
+            <div class="help-key-row"><kbd>SPACE</kbd> 드리프트 (홀드)</div>
+            <div class="help-key-row"><kbd>ENTER</kbd><kbd>E</kbd> 더블 드리프트</div>
+            <div class="help-key-tip">코너 직전에 더블 드리프트!</div>
+          </div>
+          <div class="help-card">
+            <div class="help-card-icon">⚡</div>
+            <div class="help-card-label">부스트</div>
+            <div class="help-key-row"><kbd>SHIFT</kbd> 부스트 발동</div>
+            <div class="help-key-tip">드리프트로 게이지 충전 후 직선에서 사용</div>
+          </div>
+          <div class="help-card">
+            <div class="help-card-icon">🎮</div>
+            <div class="help-card-label">기타</div>
+            <div class="help-key-row"><kbd>R</kbd> 리스폰</div>
+            <div class="help-key-row"><kbd>C</kbd> 카메라 전환</div>
+            <div class="help-key-row"><kbd>ESC</kbd> 메뉴로</div>
+          </div>
+        </div>
+        <div class="help-mobile-hint">
+          <span>📱 모바일</span> 조이스틱 조향 · 드리프트·더블드리프트·부스트 버튼 · 자동 가속
+        </div>
+        <button class="btn-primary" id="btn-help-close">닫기</button>
       </div>
     </div>
 

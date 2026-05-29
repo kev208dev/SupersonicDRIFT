@@ -3,6 +3,7 @@ import { createCar, createCar3D, updateCar3D } from '../js/car.js';
 import { KMH_PER_UNIT, TOP_SPEED_MULT, updatePhysics } from '../js/physics.js';
 import { getInput } from '../utils/input.js';
 import { getSharedRenderer } from '../js/renderer.js';
+import { createSkidBuffer } from '../js/effects.js';
 
 let renderer = null;
 let scene = null;
@@ -15,6 +16,7 @@ let running = false;
 let selectedCarData = null;
 let currentPracticeMap = 0;
 let mapGroup = null;
+let skidBuf = null;
 let toastTimer = 0;
 let practiceName = '';
 let accumulator = 0;
@@ -56,6 +58,7 @@ export function initLobbyPractice(carData) {
   if (currentPracticeMap === 0) buildPracticeArena(mapGroup);
   else buildJumpCourse(mapGroup);
   smokeParticles = createSmokeParticles(scene);
+  skidBuf = createSkidBuffer(scene, 280);
   spawnLobbyCar(carData);
   window.addEventListener('resize', onResize);
   running = true;
@@ -82,6 +85,7 @@ export function updateLobbyPractice(dt) {
     if (car.drifting) {
       driftPulse = Math.min(1, driftPulse + FIXED_DT * 5);
       spawnLobbyDriftSmoke();
+      _emitLobbySkid();
     }
     updateToyInteractions(FIXED_DT);
     updateAirTrick(FIXED_DT);
@@ -92,7 +96,6 @@ export function updateLobbyPractice(dt) {
   driftPulse = Math.max(0, driftPulse - dt * 2.4);
   updateCar3D(carMesh, car, driveInput, PRACTICE_TRACK);
   applyAirTrickVisual();
-  updateLobbyFx(dt);
   updateSmokeParticles(dt);
   updateLobbyCamera(dt);
   renderer.render(scene, camera);
@@ -260,7 +263,7 @@ function buildJumpCourse(target) {
   target.add(grid);
 
   const roadMat = new THREE.MeshStandardMaterial({ color: 0x252d3a, roughness: 0.68, metalness: 0.08 });
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(1850, 110), roadMat);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(1850, 80), roadMat);
   road.rotation.x = -Math.PI / 2;
   road.position.set(820, 0.03, 0);
   target.add(road);
@@ -276,7 +279,7 @@ function buildJumpCourse(target) {
 
   // Neon edge strips along the road
   const neonMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.75 });
-  for (const z of [-57, 57]) {
+  for (const z of [-42, 42]) {
     const strip = new THREE.Mesh(new THREE.PlaneGeometry(1850, 3), neonMat);
     strip.rotation.x = -Math.PI / 2;
     strip.position.set(820, 0.1, z);
@@ -442,13 +445,27 @@ function makeLobbyDriveInput(input) {
   };
 }
 
-function updateLobbyFx(dt) {
-  if (!carMesh) return;
-  const flame = carMesh.getObjectByName?.('boostFlame') || carMesh.getObjectByName?.('exhaustFlame');
-  if (flame) {
-    flame.visible = !!car.boosting || boostFlash > 0.08;
-    const scale = 1 + boostFlash * 1.2;
-    flame.scale.setScalar(scale);
+function _emitLobbySkid() {
+  if (!skidBuf || !car) return;
+  const a = car.angle;
+  const cs = Math.cos(a), sn = Math.sin(a);
+  const rearOffset = -7.6, sideOffset = 7.2;
+  const colors = [0x35f5ff, 0xff3b18, 0xb85cff];
+  const col = colors[Math.abs((car.id || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0)) % colors.length];
+  for (const side of [-1, 1]) {
+    const wx = car.x + rearOffset * cs - side * sideOffset * sn;
+    const wy = car.y + rearOffset * sn + side * sideOffset * cs;
+    const key = side < 0 ? '_skidL' : '_skidR';
+    const prev = car[key];
+    if (prev) {
+      const dx = wx - prev.x, dz = -wy - prev.z;
+      if (dx * dx + dz * dz > 4) {
+        skidBuf.appendTrail(prev.x, prev.z, wx, -wy, 1.15, col);
+        car[key] = { x: wx, z: -wy };
+      }
+    } else {
+      car[key] = { x: wx, z: -wy };
+    }
   }
 }
 

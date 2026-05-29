@@ -48,7 +48,14 @@ export function createCarDesign(type = 'formula_red') {
   const factory = factories[type] || factories.formula_red;
   const car = factory();
   if (type !== 'gt_silver') addCurvedSportsShellTo(car, type);
-  addBoostFlameTo(car);
+  // Dual exhausts for cars with side-mounted pipes
+  if (type === 'gt_silver' || type === 'muscle_orange' || type === 'rally_blue') {
+    addDualBoostFlameTo(car, 0.36, 0.58, -2.55);
+  } else if (type === 'buggy_yellow') {
+    addDualBoostFlameTo(car, 0.54, 0.82, -2.2);
+  } else {
+    addBoostFlameTo(car);
+  }
   car.userData.designType = type;
   return car;
 }
@@ -264,52 +271,52 @@ function addSuspensionArmTo(group, name, x, z, angle, mat) {
   return addBoxTo(group, name, [0.07, 0.07, 1.05], [x, 0.52, z], mat, [0, angle, 0]);
 }
 
-function addBoostFlameTo(group) {
+function _makeFlameGroup(x = 0, y = 0.62, z = -2.65) {
   const flame = new THREE.Group();
   flame.name = 'boostflame';
-  flame.position.set(0, 0.62, -2.65);
+  flame.position.set(x, y, z);
   flame.visible = false;
 
   const outerMat = new THREE.MeshBasicMaterial({
-    color: 0xff4a08,
-    transparent: true,
-    opacity: 0.48,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
+    color: 0xff4a08, transparent: true, opacity: 0.52,
+    blending: THREE.AdditiveBlending, depthWrite: false,
   });
   const innerMat = new THREE.MeshBasicMaterial({
-    color: 0xfff1a8,
-    transparent: true,
-    opacity: 0.82,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
+    color: 0xfff1a8, transparent: true, opacity: 0.88,
+    blending: THREE.AdditiveBlending, depthWrite: false,
   });
   const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xff1f00,
-    transparent: true,
-    opacity: 0.22,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
+    color: 0xff1f00, transparent: true, opacity: 0.28,
+    blending: THREE.AdditiveBlending, depthWrite: false,
   });
 
-  const outer = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.55, 18), outerMat);
+  const outer = new THREE.Mesh(new THREE.ConeGeometry(0.48, 2.2, 18), outerMat);
   outer.name = 'flameouter';
   outer.rotation.x = -Math.PI / 2;
   flame.add(outer);
 
-  const inner = new THREE.Mesh(new THREE.ConeGeometry(0.18, 1.15, 18), innerMat);
+  const inner = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.65, 18), innerMat);
   inner.name = 'flameinner';
   inner.rotation.x = -Math.PI / 2;
-  inner.position.z = -0.12;
+  inner.position.z = -0.14;
   flame.add(inner);
 
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.52, 18, 12), glowMat);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.72, 18, 12), glowMat);
   glow.name = 'flameglow';
-  glow.scale.set(1.1, 0.55, 1.8);
-  glow.position.z = -0.42;
+  glow.scale.set(1.2, 0.6, 2.2);
+  glow.position.z = -0.55;
   flame.add(glow);
 
-  group.add(flame);
+  return flame;
+}
+
+function addBoostFlameTo(group) {
+  group.add(_makeFlameGroup(0, 0.62, -2.65));
+}
+
+function addDualBoostFlameTo(group, xGap = 0.34, y = 0.62, z = -2.55) {
+  group.add(_makeFlameGroup(-xGap, y, z));
+  group.add(_makeFlameGroup(xGap, y, z));
 }
 
 function createFormulaRedCarModel() {
