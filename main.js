@@ -165,8 +165,13 @@ function goToMain() {
   currentScreen = 'lobbyPractice';
   if (window.gameState) window.gameState.currentScreen = 'lobby';
   showRaceCanvas();
-  initLobbyPractice({ ...selectedCar, skin: selectedSkin });
   renderLobbyHub();
+  try {
+    initLobbyPractice({ ...selectedCar, skin: selectedSkin });
+  } catch (error) {
+    console.error('Practice lobby failed to start:', error);
+    hideRaceCanvas();
+  }
   setMobileControlsVisible(true);
   showBannerAd('ad-main-menu-banner');
   initMainScreen();

@@ -437,6 +437,19 @@ select:focus-visible {
   transform: translateY(10px);
   pointer-events: none;
 }
+
+/* Practice lobby must never be covered by the old static hero layer. */
+#screen-main.screen.is-active {
+  background: transparent !important;
+  align-items: stretch;
+}
+#screen-main.screen.is-active .hero-bg-fallback,
+#screen-main.screen.is-active #hero-bg-video {
+  display: none !important;
+}
+#screen-main.screen.is-active .hero-overlay {
+  background: transparent !important;
+}
 .main-info {
   display: none;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2116,7 +2129,7 @@ select:focus-visible {
 .mobile-controls {
   position: fixed;
   inset: auto 0 0 0;
-  z-index: 6;
+  z-index: 65;
   display: none;
   justify-content: space-between;
   align-items: flex-end;
