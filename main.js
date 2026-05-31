@@ -613,14 +613,14 @@ function _wireGlobalLeaderboard() {
   const closeBtn = document.getElementById('btn-leaderboard-close');
   const refreshBtn = document.getElementById('btn-leaderboard-refresh');
   const trackFilter = document.getElementById('leaderboard-track-filter');
-  if (!openBtn || !overlay) return;
+  if (!overlay) return; // openBtn은 car-select 제거로 없을 수 있으므로 overlay만 체크
 
   if (trackFilter) trackFilter.addEventListener('change', () => _loadGlobalLeaderboard());
 
   const open = () => _openLeaderboardOverlay();
   const close = () => returnScreenAfterPanel === 'main' ? goToMain() : showScreen(returnScreenAfterPanel || 'main');
 
-  openBtn.addEventListener('click', open);
+  openBtn?.addEventListener('click', open);
   closeBtn && closeBtn.addEventListener('click', close);
   refreshBtn && refreshBtn.addEventListener('click', () => _loadGlobalLeaderboard());
   overlay.addEventListener('click', e => {
