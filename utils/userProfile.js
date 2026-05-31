@@ -72,7 +72,7 @@ export function renderProfileCard(profile = getUserProfile(), player = {}, optio
   const display = getDisplayProfile();
   const merged = applyProfileCustomization(profile);
   const color = colorById(merged.avatarColor) || player.themeColor || display.themeColor || '#3b82f6';
-  const el = document.createElement('article');
+  const el = document.createElement(options.asListItem ? 'li' : 'article');
   el.className = 'lobby-profile-card'
     + (options.isMe ? ' is-me' : '')
     + (options.isHost ? ' is-host' : '')

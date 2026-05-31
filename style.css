@@ -1769,8 +1769,6 @@ select:focus-visible {
   font-size: 0.72rem;
   font-weight: 700;
 }
-.car-buy { margin-top: 8px; width: 100%; }
-.car-buy:disabled { opacity: 0.48; cursor: not-allowed; }
 .home-leaderboard {
   align-self: stretch; background: #151b23; border: 1px solid #30363d;
   border-radius: 12px; padding: 16px; min-height: 360px;

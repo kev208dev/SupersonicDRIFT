@@ -321,7 +321,7 @@ class MpClient {
     queue.players.add(this);
     if (queue.players.size === 1) {
       queue.firstJoinAt = Date.now();
-      queue.maxWaitTimer = setTimeout(() => promoteQuickQueue(trackId, /*forceSolo*/ true), QUICK_MAX_WAIT_MS);
+      queue.maxWaitTimer = setTimeout(() => promoteQuickQueue(trackId, /*allowSolo*/ true), QUICK_MAX_WAIT_MS);
     }
     if (queue.players.size >= 2 && !queue.timer) {
       queue.timer = setTimeout(() => promoteQuickQueue(trackId), QUICK_FILL_MS);
@@ -861,11 +861,6 @@ function promoteQuickQueue(trackId, allowSolo = false) {
 
   QUICK_QUEUES.delete(trackId);
   for (const p of players) p.queueTrackId = null;
-
-  if (players.length === 1) {
-    players[0].send({ t: 'queueExpired', trackId });
-    return;
-  }
 
   const code = `Q-${randomBytes(2).toString('hex').toUpperCase()}`;
   const room = new Room(code, trackId, /*isPrivate*/ false);

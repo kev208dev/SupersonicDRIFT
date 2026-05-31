@@ -5,10 +5,10 @@ import { initTrackSelect }  from './screens/trackSelect.js';
 import { TRACKS }           from './data/tracks.js';
 import { initGame, updateGame, stopGame } from './screens/game.js';
 import { initResults }      from './screens/results.js';
-import { initLobby, teardownLobby, detachNet } from './screens/lobby.js';
+import { initLobby, detachNet } from './screens/lobby.js';
 import { initMpGame, updateMpGame, stopMpGame } from './screens/mpGame.js';
 import { initMpResults }    from './screens/mpResults.js';
-import { initLobbyPractice, updateLobbyPractice, stopLobbyPractice, switchLobbyCar, respawnLobbyCar, showLobbyCarToast, switchPracticeMap } from './screens/lobbyPractice.js';
+import { initLobbyPractice, updateLobbyPractice, stopLobbyPractice, switchLobbyCar, showLobbyCarToast, switchPracticeMap } from './screens/lobbyPractice.js';
 import { initAuth }         from './utils/auth.js';
 import { getCurrentUser, onAuthChange, signOut, signInLocal, signUpLocal } from './utils/auth.js';
 import { clearFrameKeys }   from './utils/input.js';
@@ -38,8 +38,6 @@ import { updateGameState, selectGameMode, selectCarAndSkin } from './js/state.js
 import { renderSeasonPanel, fetchSeasonLeaderboard } from './js/seasons.js';
 import { getRating, renderRatingBadge } from './js/rating.js';
 import { renderMissionPanel, updateMissionProgress } from './js/missions.js';
-import { renderGarage } from './js/unlocks.js';
-import { renderOnboarding } from './js/onboarding.js';
 
 let currentScreen = 'main';
 let selectedCar   = null;
@@ -155,6 +153,7 @@ function hideRaceCanvas() {
 
 // ── transitions ─────────────────────────────────────────────
 function goToMain() {
+  stopLobbyPractice();
   ensureDefaultLoadout();
   updateGameState({ currentScreen: 'lobby', isRaceRunning: false, selectedCar: selectedCar?.id });
   showScreen('main');
@@ -205,12 +204,11 @@ function renderLobbyHub() {
   }
   if (stripEl) {
     stripEl.innerHTML = CAR_DATA.map(item => {
-      const owned = isCarUnlocked(item);
       const selected = item.id === car.id;
       return `
-        <button class="lobby-car-card${selected ? ' selected' : ''}${owned ? '' : ' locked'}" data-lobby-car="${item.id}" type="button" ${owned ? '' : 'disabled'}>
+        <button class="lobby-car-card${selected ? ' selected' : ''}" data-lobby-car="${item.id}" type="button">
           <b>${item.name}</b>
-          <small>${owned ? (selected ? 'SELECTED' : item.rarity || item.category) : 'LOCKED'}</small>
+          <small>${selected ? 'SELECTED' : item.rarity || item.category}</small>
         </button>
       `;
     }).join('');
@@ -222,7 +220,7 @@ function renderLobbyHub() {
 
 function selectLobbyCar(carId) {
   const car = CAR_DATA.find(item => item.id === carId);
-  if (!car || !isCarUnlocked(car)) return;
+  if (!car) return;
   selectedCar = car;
   localStorage.setItem('selectedCarId', car.id);
   localStorage.setItem('racingSelectedCar', car.id);
@@ -246,10 +244,11 @@ function _openAuth() {
 }
 
 function goToAuth() {
-  goToMain();
+  _openAuth();
 }
 
 function goToCarSelect(options = {}) {
+  stopLobbyPractice();
   carSelectContext = options.context || 'garage';
   carSelectAfterSkin = typeof options.afterSkin === 'function' ? options.afterSkin : null;
   carSelectBackHandler = typeof options.onBack === 'function' ? options.onBack : () => goToMain();
@@ -448,7 +447,7 @@ function initGarageOnce() {
       if (next) next();
       return;
     }
-    goToSkinSelect();
+    goToMain();
   });
   console.timeEnd('initGarage');
 }
@@ -466,9 +465,9 @@ function configureCarSelectScreen(context = 'garage') {
   if (subtitle) {
     subtitle.textContent = isRaceSetup
       ? 'Choose the car you want to race with.'
-      : 'View cars, stats, and unlock progress.';
+      : 'Choose the car for the practice lobby.';
   }
-  if (continueBtn) continueBtn.textContent = isRaceSetup ? 'Continue' : 'Select Car';
+  if (continueBtn) continueBtn.textContent = isRaceSetup ? 'Start With Car' : 'Use This Car';
   if (backBtn) backBtn.onclick = () => carSelectBackHandler?.();
   if (leaderboard) leaderboard.hidden = true;
   if (layout) layout.classList.toggle('car-select-focused', true);
@@ -814,7 +813,9 @@ function _wireProfilePanel() {
   const save = document.getElementById('btn-profile-save');
   if (!openBtn || !panel) return;
 
-  openBtn.addEventListener('click', () => goToCarSelect());
+  openBtn.addEventListener('click', () => {
+    panel.classList.toggle('hidden');
+  });
   closeBtn?.addEventListener('click', () => panel.classList.add('hidden'));
   logout && (logout.onclick = async () => {
     await signOut();
@@ -846,8 +847,7 @@ function _renderProfilePanel() {
   const local = getPlayerProfile();
   const name = profile?.nickname || local.name;
   const color = profile?.theme_color || '#2ec4b6';
-  const coins = profile?.coins || 0;
-  const ownedCount = profile?.owned_car_ids?.length || 2;
+  const ownedCount = profile?.owned_car_ids?.length || CAR_DATA.length;
   const chipName = document.getElementById('profile-chip-name');
   const chipCoins = document.getElementById('profile-chip-coins');
   const dot = document.getElementById('profile-dot');
@@ -859,7 +859,7 @@ function _renderProfilePanel() {
   const status = document.getElementById('auth-status');
 
   if (chipName) chipName.textContent = user ? name : 'Guest';
-  if (chipCoins) chipCoins.textContent = user ? coins.toLocaleString() : 'login';
+  if (chipCoins) chipCoins.textContent = `${CAR_DATA.length} cars`;
   if (dot) dot.style.background = color;
   if (nickname) {
     nickname.value = name;
@@ -869,12 +869,12 @@ function _renderProfilePanel() {
     theme.value = color;
     theme.disabled = !user || isProfileLoading();
   }
-  if (coinsEl) coinsEl.textContent = coins.toLocaleString();
+  if (coinsEl) coinsEl.textContent = `${CAR_DATA.length}/${CAR_DATA.length}`;
   if (note) note.textContent = user
-    ? `${ownedCount}/${CAR_DATA.length}대 소유 · 미션 클리어로 코인을 모아 구매하세요.`
-    : '게스트는 기본 차량만 사용할 수 있습니다.';
+    ? `${ownedCount}/${CAR_DATA.length}대 사용 가능 · 로그인 상태로 기록과 프로필이 저장됩니다.`
+    : '게스트도 모든 차량을 바로 사용할 수 있습니다.';
   if (logout) logout.classList.toggle('hidden', !user);
-  if (status) status.textContent = user ? `${user.id} 로그인됨` : '로그인하면 코인과 차량을 저장합니다.';
+  if (status) status.textContent = user ? `${user.id} 로그인됨` : '로그인하면 프로필과 기록을 저장합니다.';
 }
 
 function _renderRatingBadgeInProfile() {
@@ -1055,6 +1055,14 @@ function _safeInit(label, fn) {
   }
 }
 
+async function _safeAsyncInit(label, fn) {
+  try {
+    await fn();
+  } catch (error) {
+    console.error(`Init step "${label}" failed:`, error);
+  }
+}
+
 _safeInit('analytics', initAnalytics);
 _safeInit('clearRecords', clearRaceRecordsOnce);
 _safeInit('mobileControls', initMobileControls);
@@ -1071,16 +1079,8 @@ _safeInit('globalCompletionToast', _wireGlobalCompletionToast);
 // even if auth/profile init below throws or rejects.
 startGameLoopOnce();
 
-try {
-  await initAuth();
-} catch (error) {
-  console.error('initAuth failed:', error);
-}
-try {
-  initProfile();
-} catch (error) {
-  console.error('initProfile failed:', error);
-}
+await _safeAsyncInit('auth', initAuth);
+_safeInit('profile', initProfile);
 
 _safeInit('authChange', () => {
   onAuthChange(() => {
@@ -1089,5 +1089,5 @@ _safeInit('authChange', () => {
 });
 
 // ── start ────────────────────────────────────────────────────
-goToMain();
+_safeInit('startMain', goToMain);
 console.timeEnd('initial-load');

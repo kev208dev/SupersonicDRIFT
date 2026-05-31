@@ -1,12 +1,9 @@
 import { CAR_DATA } from '../data/cars.js';
 import { getCarPowerTotal, isTranscendCar, renderCarStatRows } from '../js/carStats.js';
-import { isCarUnlocked, unlockProgressText, unlockText } from '../utils/unlocks.js';
-import { getProfile, onProfileChange, purchaseCar } from '../utils/profile.js';
 
 let selectedIndex    = 0;
 let selectedCategory = 'All';
 let onSelect         = null;
-let profileUnsub     = null;
 
 const CATEGORIES = ['All', 'GT3', 'Lightweight', 'Prototype', 'Road Car', 'Heavyweight', 'Formula', 'Transcendent'];
 
@@ -14,7 +11,6 @@ export function initCarSelect(cb) {
   onSelect         = cb;
   selectedIndex    = 0;
   selectedCategory = 'All';
-  if (!profileUnsub) profileUnsub = onProfileChange(() => _render());
   _render();
 }
 
@@ -26,11 +22,6 @@ function _filtered() {
 }
 
 function _render() {
-  if (_isLocked(CAR_DATA[selectedIndex])) {
-    const firstOpen = CAR_DATA.findIndex(car => !_isLocked(car));
-    if (firstOpen >= 0) selectedIndex = firstOpen;
-  }
-
   // ── category tabs ──
   const tabsEl = document.getElementById('cat-tabs');
   if (tabsEl) {
@@ -52,8 +43,7 @@ function _render() {
   _filtered().forEach(car => {
     const idx  = CAR_DATA.indexOf(car);
     const card = document.createElement('div');
-    const locked = _isLocked(car);
-    card.className = 'car-card' + (idx === selectedIndex ? ' selected' : '') + (locked ? ' locked' : '');
+    card.className = 'car-card' + (idx === selectedIndex ? ' selected' : '');
 
     // mini preview canvas
     const previewDiv = document.createElement('div');
@@ -66,11 +56,11 @@ function _render() {
     card.appendChild(previewDiv);
     card.insertAdjacentHTML('beforeend', `
       <div class="car-name">${car.name}</div>
-        <span class="car-badge ${isTranscendCar(car.id) ? 'transcend-badge' : ''}">${isTranscendCar(car.id) ? 'TRANSCEND' : locked ? (Number(car.price || 0) <= 0 ? 'LOCKED' : 'SHOP') : car.rarity || car.category}</span>
+        <span class="car-badge ${isTranscendCar(car.id) ? 'transcend-badge' : ''}">${isTranscendCar(car.id) ? 'TRANSCEND' : car.rarity || car.category}</span>
       <div class="car-tags">
         <span>${car.driveType}</span>
         <span>${car.power} hp</span>
-        <span>${locked ? `${Number(car.price || 0).toLocaleString()} C` : 'OWNED'}</span>
+        <span>READY</span>
       </div>
       <div class="car-power">Total Power <b>${getCarPowerTotal(car.id)}</b></div>
       <div class="car-spec car-stat-list">
@@ -78,40 +68,7 @@ function _render() {
       </div>
     `);
 
-    if (locked) {
-      const lock = document.createElement('div');
-      lock.className = 'car-lock';
-      const profile = getProfile();
-      const price = Number(car.price || 0);
-      const canBuy = !!profile && (profile.coins || 0) >= price;
-      lock.innerHTML = `
-        <b>${unlockText(car)}</b>
-        <span>${unlockProgressText(car)}</span>
-        <button class="btn-secondary btn-small car-buy" type="button">${canBuy ? 'Buy' : 'Locked'}</button>
-      `;
-      const buy = lock.querySelector('.car-buy');
-      buy.disabled = !canBuy;
-      buy.addEventListener('click', async event => {
-        event.stopPropagation();
-        try {
-          buy.textContent = 'Buying...';
-          await purchaseCar(car);
-          selectedIndex = idx;
-          _render();
-        } catch (error) {
-          buy.textContent = error?.message === 'login-required' ? 'Login needed' : 'Not enough coins';
-          setTimeout(() => _render(), 900);
-        }
-      });
-      card.appendChild(lock);
-    }
-
     card.addEventListener('click', () => {
-      if (locked) {
-        const descEl = document.getElementById('car-desc');
-        if (descEl) descEl.textContent = `${car.name} unlock condition: ${unlockText(car)}. ${unlockProgressText(car)}.`;
-        return;
-      }
       selectedIndex = idx;
       _render();
     });
@@ -128,24 +85,8 @@ function _render() {
   const btn = document.getElementById('btn-to-track');
   if (btn) btn.onclick = () => {
     const car = CAR_DATA[selectedIndex];
-    if (_isLocked(car)) return;
     if (onSelect) onSelect(car);
   };
-}
-
-function _isLocked(car) {
-  return !car || !isCarUnlocked(car);
-}
-
-function _statRow(label, value) {
-  const over = value > 1.05;
-  const pct = Math.max(8, Math.min(100, Math.round(value * 100)));
-  return `
-    <div class="stat-row${over ? ' over' : ''}">
-      <span>${label}</span>
-      <b><i style="width:${pct}%"></i></b>
-    </div>
-  `;
 }
 
 export function initCarCinematicPreview() {

@@ -286,6 +286,7 @@ function _renderRoom(room) {
       list.appendChild(renderProfileCard(profile, p, {
         isMe: p.id === myClientId,
         isHost: p.isHost,
+        asListItem: true,
       }));
     }
     const emptySlots = Math.max(0, 4 - room.players.length);

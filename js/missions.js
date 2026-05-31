@@ -3,17 +3,17 @@ import { safeLoadJSON, safeSaveJSON } from './storage.js';
 export const DAILY_MISSIONS_KEY = 'racingDailyMissions';
 export const WEEKLY_MISSIONS_KEY = 'racingWeeklyMissions';
 export const MISSION_PROGRESS_KEY = 'racingMissionProgress';
-export const COINS_KEY = 'racingCoins';
+export const REWARD_POINTS_KEY = 'racingRewardPoints';
 
 export const missionTemplates = [
-  { id: 'daily_finish_3', type: 'daily', difficulty: 'easy', eventName: 'race_finish', title: 'Finish 3 races', description: 'Complete 3 races today.', target: 3, reward: { coins: 100 } },
-  { id: 'daily_boost_5', type: 'daily', difficulty: 'easy', eventName: 'boost_used', title: 'Use Boost 5 times', description: 'Use boost 5 times in any mode.', target: 5, reward: { coins: 80 } },
-  { id: 'daily_time_trial_1', type: 'daily', difficulty: 'easy', eventName: 'time_trial_played', title: 'Run Time Trial', description: 'Official records are saved in this mode.', target: 1, reward: { coins: 70 } },
-  { id: 'daily_no_throttle_limit', type: 'daily', difficulty: 'normal', eventName: 'no_throttle_finish', title: 'No-throttle finish', description: 'Finish without the accelerate key within target time x1.3.', target: 1, reward: { coins: 150 } },
-  { id: 'weekly_track_100', type: 'weekly', difficulty: 'hard', eventName: 'same_track_finish', title: 'Finish one map 100 times', description: 'Reduced from 1000 to a realistic 100 finishes.', target: 100, reward: { coins: 650 } },
-  { id: 'weekly_drift_300', type: 'weekly', difficulty: 'hard', eventName: 'drift_second', title: 'Drift 300 seconds', description: 'Build total drift time this week.', target: 300, reward: { coins: 500 } },
-  { id: 'weekly_boost_100', type: 'weekly', difficulty: 'normal', eventName: 'boost_used', title: 'Use Boost 100 times', description: 'Practice boost timing on every track.', target: 100, reward: { coins: 450 } },
-  { id: 'weekly_friendly_1', type: 'weekly', difficulty: 'easy', eventName: 'friendly_room_created', title: 'Create a friendly room', description: 'Invite a friend to a room.', target: 1, reward: { coins: 120 } },
+  { id: 'daily_finish_3', type: 'daily', difficulty: 'easy', eventName: 'race_finish', title: 'Finish 3 races', description: 'Complete 3 races today.', target: 3, reward: { points: 100 } },
+  { id: 'daily_boost_5', type: 'daily', difficulty: 'easy', eventName: 'boost_used', title: 'Use Boost 5 times', description: 'Use boost 5 times in any mode.', target: 5, reward: { points: 80 } },
+  { id: 'daily_time_trial_1', type: 'daily', difficulty: 'easy', eventName: 'time_trial_played', title: 'Run Time Trial', description: 'Official records are saved in this mode.', target: 1, reward: { points: 70 } },
+  { id: 'daily_no_throttle_limit', type: 'daily', difficulty: 'normal', eventName: 'no_throttle_finish', title: 'No-throttle finish', description: 'Finish without the accelerate key within target time x1.3.', target: 1, reward: { points: 150 } },
+  { id: 'weekly_track_100', type: 'weekly', difficulty: 'hard', eventName: 'same_track_finish', title: 'Finish one map 100 times', description: 'Reduced from 1000 to a realistic 100 finishes.', target: 100, reward: { points: 650 } },
+  { id: 'weekly_drift_300', type: 'weekly', difficulty: 'hard', eventName: 'drift_second', title: 'Drift 300 seconds', description: 'Build total drift time this week.', target: 300, reward: { points: 500 } },
+  { id: 'weekly_boost_100', type: 'weekly', difficulty: 'normal', eventName: 'boost_used', title: 'Use Boost 100 times', description: 'Practice boost timing on every track.', target: 100, reward: { points: 450 } },
+  { id: 'weekly_friendly_1', type: 'weekly', difficulty: 'easy', eventName: 'friendly_room_created', title: 'Create a friendly room', description: 'Invite a friend to a room.', target: 1, reward: { points: 120 } },
 ];
 
 export function generateDailyMissions() {
@@ -47,8 +47,8 @@ export function claimMissionReward(missionId) {
   const mission = all.find(item => item.id === missionId);
   if (!mission || mission.claimed || Number(progress[mission.id] || 0) < mission.target) return false;
   mission.claimed = true;
-  const coins = Number(localStorage.getItem(COINS_KEY) || 0) + Number(mission.reward?.coins || 0);
-  localStorage.setItem(COINS_KEY, String(coins));
+  const points = Number(localStorage.getItem(REWARD_POINTS_KEY) || 0) + rewardValue(mission);
+  localStorage.setItem(REWARD_POINTS_KEY, String(points));
   safeSaveJSON(daily.key, daily);
   safeSaveJSON(weekly.key, weekly);
   window.dispatchEvent(new CustomEvent('racing:missionsChange'));
@@ -62,7 +62,7 @@ export function renderMissionPanel(target = document.getElementById('mission-pan
   target.innerHTML = `
     <div class="mission-panel-head ui-panel-title-row">
       <div><span class="ui-kicker">Goals</span><h2 class="ui-section-title">Daily <span class="ui-highlight-goal">Missions</span></h2></div>
-      <b class="ui-highlight-goal">${Number(localStorage.getItem(COINS_KEY) || 0).toLocaleString()} coins</b>
+      <b class="ui-highlight-goal">${Number(localStorage.getItem(REWARD_POINTS_KEY) || 0).toLocaleString()} pts</b>
     </div>
     <div class="mission-list">
       ${missions.map(mission => {
@@ -73,7 +73,7 @@ export function renderMissionPanel(target = document.getElementById('mission-pan
           <em class="mission-difficulty mission-difficulty-${escapeHtml(mission.difficulty || 'easy')}">${escapeHtml(mission.difficulty || 'easy')}</em>
           <em>${value}/${mission.target}</em>
           <i style="--mission-progress:${(value / mission.target) * 100}%"></i>
-          <strong>${mission.claimed ? 'Claimed' : done ? 'Claim' : `${mission.reward.coins}c`}</strong>
+          <strong>${mission.claimed ? 'Claimed' : done ? 'Claim' : `${rewardValue(mission)}p`}</strong>
         </button>`;
       }).join('')}
     </div>
@@ -92,6 +92,10 @@ function seedMissions(key, type, stamp, count) {
   const next = { stamp, missions };
   safeSaveJSON(key, next);
   return { ...next, key };
+}
+
+function rewardValue(mission) {
+  return Number(mission?.reward?.points ?? mission?.reward?.coins ?? 0);
 }
 
 function todayKey() {

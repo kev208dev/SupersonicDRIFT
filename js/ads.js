@@ -1,11 +1,15 @@
+const BANNER_SLOTS = [
+  'ad-main-menu-banner',
+  'ad-lobby-side',
+  'ad-game-over-banner',
+];
+
 export function initAds() {
-  showBannerAd('ad-main-menu-banner');
-  showBannerAd('ad-game-over-banner');
+  BANNER_SLOTS.forEach(showBannerAd);
 }
 
 export function showBannerAd(slotId) {
   const slot = document.getElementById(slotId);
-  console.log('Banner ad placeholder:', slotId);
   if (!slot) return;
   // Insert Google AdSense or another banner SDK render call here later.
   slot.classList.add('ad-placeholder');

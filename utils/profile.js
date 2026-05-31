@@ -6,16 +6,11 @@ import { getPlayerProfile, setLeaderboardIdentity, setPlayerName } from './leade
 import { safeNickname, validateNickname } from './nicknameFilter.js';
 
 const PROFILES_KEY = 'racing_local_profiles';
-const DEFAULT_OWNED = ['apex_gt3', 'feather_sprint'];
 const DEFAULT_SKINS = ['factory', 'neon', 'classic'];
 const DEFAULT_THEME = '#2ec4b6';
 const SUPER_ACCOUNT_IDS = new Set(['admin', 'kev208', 'kev208dev', 'tiger0208', 'wkddodls']);
 const SUPER_ACCOUNT_NICKNAMES = {
   tiger0208: 'ㅈㅈㅈ',
-};
-const ACCOUNT_CAR_UNLOCKS = {
-  ahgo: ['zero_f1'],
-  'i-mtheking': ['zero_f1'],
 };
 const ALL_CAR_IDS = CAR_DATA.map(car => car.id);
 const ALL_SKIN_IDS = SKIN_DATA.map(skin => skin.id);
@@ -78,10 +73,7 @@ export function getDisplayProfile() {
 }
 
 export function isOwned(carId) {
-  if (isSuperAccount()) return ALL_CAR_IDS.includes(carId);
-  if (accountUnlockIds().includes(carId)) return true;
-  if (!getCurrentUser()) return DEFAULT_OWNED.includes(carId);
-  return !!profile?.owned_car_ids?.includes(carId);
+  return ALL_CAR_IDS.includes(carId);
 }
 
 export function isSkinOwned(skinId) {
@@ -98,30 +90,6 @@ export async function updateProfileSettings({ nickname, themeColor }) {
   profile = saveProfile({ ...profile, nickname: cleanName, theme_color: cleanColor });
   setPlayerName(profile.nickname);
   setLeaderboardIdentity({ id: profile.user_id, name: profile.nickname, themeColor: profile.theme_color });
-  notify();
-  return profile;
-}
-
-export async function purchaseCar(car) {
-  if (!profile) throw new Error('login-required');
-  if (isOwned(car.id)) return profile;
-  const price = Number(car.price || 0);
-  if (price <= 0) return addOwnedCar(car.id);
-  if ((profile.coins || 0) < price) throw new Error('not-enough-coins');
-  const nextOwned = unique([...(profile.owned_car_ids || []), car.id]);
-  const nextCoins = Math.max(0, (profile.coins || 0) - price);
-  profile = saveProfile({ ...profile, coins: nextCoins, owned_car_ids: nextOwned });
-  notify();
-  return profile;
-}
-
-export async function claimStarterCar(carId) {
-  if (!profile) throw new Error('login-required');
-  if (profile.starter_claimed) return profile;
-  const car = CAR_DATA.find(item => item.id === carId);
-  if (!car) throw new Error('unknown-car');
-  const nextOwned = unique([...(profile.owned_car_ids || []), car.id]);
-  profile = saveProfile({ ...profile, owned_car_ids: nextOwned, starter_claimed: true });
   notify();
   return profile;
 }
@@ -247,26 +215,6 @@ export function getSkinProgressText(skin) {
   return '조건을 달성하면 해금';
 }
 
-export function rollStarterCar() {
-  const pool = CAR_DATA.filter(car => (car.starterWeight || 0) > 0 && !isOwned(car.id));
-  const fallback = CAR_DATA.find(car => !isOwned(car.id)) || CAR_DATA[0];
-  if (!pool.length) return fallback;
-  const total = pool.reduce((sum, car) => sum + car.starterWeight, 0);
-  let ticket = Math.random() * total;
-  for (const car of pool) {
-    ticket -= car.starterWeight;
-    if (ticket <= 0) return car;
-  }
-  return pool[pool.length - 1];
-}
-
-function addOwnedCar(carId) {
-  const nextOwned = unique([...(profile.owned_car_ids || []), carId]);
-  profile = saveProfile({ ...profile, owned_car_ids: nextOwned });
-  notify();
-  return profile;
-}
-
 function readStore() {
   try {
     const raw = localStorage.getItem(PROFILES_KEY);
@@ -286,10 +234,6 @@ function ensureProfile(user) {
   const existing = store[user.id];
   if (existing) {
     let normalized = normalizeProfile(existing, user);
-    const accountUnlocks = accountUnlockIds(user);
-    if (accountUnlocks.some(id => !normalized.owned_car_ids.includes(id))) {
-      normalized = saveProfile({ ...normalized, owned_car_ids: unique([...normalized.owned_car_ids, ...accountUnlocks]) });
-    }
     if (isSuperAccount(user)) {
       normalized = saveProfile({
         ...normalized,
@@ -308,11 +252,11 @@ function ensureProfile(user) {
     nickname,
     theme_color: DEFAULT_THEME,
     coins: 0,
-    owned_car_ids: isSuperAccount(user) ? ALL_CAR_IDS : unique([...DEFAULT_OWNED, ...accountUnlockIds(user)]),
+    owned_car_ids: ALL_CAR_IDS,
     owned_skin_ids: isSuperAccount(user) ? ALL_SKIN_IDS : [...DEFAULT_SKINS],
     completed_missions: [],
     stats: {},
-    starter_claimed: isSuperAccount(user),
+    starter_claimed: true,
   };
   return saveProfile(fresh);
 }
@@ -326,37 +270,20 @@ function saveProfile(next) {
 }
 
 function normalizeProfile(row, user = getCurrentUser()) {
-  const owned = Array.isArray(row.owned_car_ids) ? row.owned_car_ids : DEFAULT_OWNED;
   const ownedSkins = Array.isArray(row.owned_skin_ids) ? row.owned_skin_ids : DEFAULT_SKINS;
   const userId = row.user_id || user?.id;
-  const accountUnlocks = accountUnlockIds({ id: userId });
   const superAccount = isSuperAccount({ id: userId });
-  const safeOwnedCars = superAccount ? ALL_CAR_IDS : repairOwnedCars(owned, row, userId);
   return {
     user_id: userId,
     nickname: getSuperNickname({ id: userId }) || safeNickname(row.nickname, 'Driver'),
     theme_color: normalizeColor(row.theme_color) || DEFAULT_THEME,
     coins: Number(row.coins || 0),
-    owned_car_ids: superAccount ? ALL_CAR_IDS : unique([...safeOwnedCars, ...accountUnlocks]),
+    owned_car_ids: ALL_CAR_IDS,
     owned_skin_ids: superAccount ? ALL_SKIN_IDS : unique([...DEFAULT_SKINS, ...ownedSkins]),
     completed_missions: Array.isArray(row.completed_missions) ? row.completed_missions : [],
     stats: row.stats && typeof row.stats === 'object' ? row.stats : {},
-    starter_claimed: superAccount || !!row.starter_claimed,
+    starter_claimed: true,
   };
-}
-
-function repairOwnedCars(owned, row, userId) {
-  const cleanOwned = unique(owned);
-  const ownsEveryCar = ALL_CAR_IDS.every(id => cleanOwned.includes(id));
-  if (!ownsEveryCar) return cleanOwned;
-
-  const noProgressSignals =
-    Number(row.coins || 0) === 0
-    && (!Array.isArray(row.completed_missions) || row.completed_missions.length === 0)
-    && (!row.stats || Object.keys(row.stats).length === 0);
-
-  if (!noProgressSignals) return cleanOwned;
-  return unique([...DEFAULT_OWNED, ...accountUnlockIds({ id: userId })]);
 }
 
 function isSuperAccount(user = getCurrentUser()) {
@@ -367,11 +294,6 @@ function isSuperAccount(user = getCurrentUser()) {
 function getSuperNickname(user = getCurrentUser()) {
   const id = String(user?.id || '').trim().toLowerCase();
   return SUPER_ACCOUNT_NICKNAMES[id] || null;
-}
-
-function accountUnlockIds(user = getCurrentUser()) {
-  const id = String(user?.id || '').trim().toLowerCase();
-  return ACCOUNT_CAR_UNLOCKS[id] || [];
 }
 
 function isRepeatableMission(mission) {
