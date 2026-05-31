@@ -574,7 +574,7 @@ function drawSpeedStreaks(ctx, w, h, kmh, dt) {
   if (intensity <= 0.02) return;
   ctx.save();
   ctx.globalAlpha = 0.18 * intensity;
-  ctx.strokeStyle = car.boosting ? '#facc15' : '#38bdf8';
+  ctx.strokeStyle = car.boosting ? '#FFD400' : '#A8A8A3';
   ctx.lineWidth = 2 + intensity * 3;
   const count = Math.floor(12 + intensity * 18);
   for (let i = 0; i < count; i++) {
@@ -596,32 +596,28 @@ function drawBoostHud(ctx, w, h, kmh) {
   const bh = 12;
   const boost = Math.max(0, Math.min(100, car.boostMeter || 0));
   ctx.save();
-  ctx.fillStyle = 'rgba(2, 6, 23, 0.58)';
-  ctx.strokeStyle = car.boosting ? 'rgba(250, 204, 21, 0.92)' : 'rgba(148, 163, 184, 0.28)';
+  ctx.fillStyle = 'rgba(26, 26, 29, 0.88)';
+  ctx.strokeStyle = car.boosting ? 'rgba(255, 212, 0, 0.92)' : 'rgba(46, 46, 51, 0.88)';
   ctx.lineWidth = 1;
   roundRect(ctx, x - 14, y - 34, bw + 28, 62, 16);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = '#f8fafc';
+  ctx.fillStyle = '#F5F5F4';
   ctx.font = '900 18px system-ui';
   ctx.textAlign = 'left';
   ctx.fillText(`${kmh} km/h`, x, y - 10);
   ctx.textAlign = 'right';
-  ctx.fillStyle = car.boosting ? '#facc15' : '#38bdf8';
+  ctx.fillStyle = car.boosting ? '#FFD400' : '#A8A8A3';
   ctx.fillText(car.boosting ? 'BOOST' : 'LOBBY PRACTICE', x + bw, y - 10);
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.22)';
+  ctx.fillStyle = 'rgba(46, 46, 51, 0.88)';
   roundRect(ctx, x, y, bw, bh, 999);
   ctx.fill();
-  const grad = ctx.createLinearGradient(x, y, x + bw, y);
-  grad.addColorStop(0, '#ff5a1f');
-  grad.addColorStop(0.55, '#facc15');
-  grad.addColorStop(1, '#38bdf8');
-  ctx.fillStyle = grad;
+  ctx.fillStyle = '#FFD400';
   roundRect(ctx, x, y, bw * boost / 100, bh, 999);
   ctx.fill();
   if (driftPulse > 0.05) {
     ctx.globalAlpha = driftPulse;
-    ctx.fillStyle = '#f8fafc';
+    ctx.fillStyle = '#FFD400';
     ctx.font = '800 12px system-ui';
     ctx.textAlign = 'center';
     ctx.fillText('DRIFT CHARGING BOOST', x + bw / 2, y + 30);

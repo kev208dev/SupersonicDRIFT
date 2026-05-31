@@ -33,7 +33,7 @@ export function drawHUD(ctx, car, timing, canvasW, canvasH, track, ghost = null)
   const gearX = 300, gearY = barY + 75;
   ctx.font = 'bold 13px monospace';
   ctx.textAlign = 'center';
-  ctx.fillStyle = (car.transmission === 'manual') ? '#f4a261' : '#79b8ff';
+  ctx.fillStyle = (car.transmission === 'manual') ? '#FFD400' : '#A8A8A3';
   ctx.fillText(car.transmission === 'manual' ? 'MANUAL' : 'AUTO', gearX, barY + 18);
 
   const redline = rpmRatio > 0.92;
@@ -45,10 +45,10 @@ export function drawHUD(ctx, car, timing, canvasW, canvasH, track, ghost = null)
   ctx.font = '13px monospace';
   ctx.textAlign = 'left';
   if (car.offTrack) {
-    ctx.fillStyle = '#f4a261';
+    ctx.fillStyle = '#FF453A';
     ctx.fillText('OFF TRACK', 180, barY + 55);
   } else if (car.drifting) {
-    ctx.fillStyle = '#9be9a8';
+    ctx.fillStyle = '#FFD400';
     ctx.fillText('DRIFT!', 180, barY + 55);
   }
 
@@ -86,7 +86,7 @@ export function drawHUD(ctx, car, timing, canvasW, canvasH, track, ghost = null)
   ctx.fillStyle = '#aaa';
   ctx.fillText('BEST', lapX + 150, barY + 28);
   ctx.font = 'bold 16px monospace';
-  ctx.fillStyle = '#c77dff';
+  ctx.fillStyle = '#A8A8A3';
   ctx.fillText(timing.bestLap ? formatTime(timing.bestLap) : '--:--.---', lapX + 150, barY + 52);
 
   // sectors
@@ -95,7 +95,7 @@ export function drawHUD(ctx, car, timing, canvasW, canvasH, track, ghost = null)
   // off-track warning (top-center)
   if (car.offTrack) {
     ctx.font = 'bold 22px monospace';
-    ctx.fillStyle = '#f4a261';
+    ctx.fillStyle = '#FF453A';
     ctx.textAlign = 'center';
     ctx.fillText('OFF TRACK', canvasW / 2, 50);
   }
@@ -144,7 +144,7 @@ function _drawMinimap(ctx, car, track, x, y, w, h, ghost) {
     const head = ghost.path[Math.min(ghost.path.length - 1, Math.floor(ghost.path.length * 0.55))];
     const hx = x + (head.x - m.minX) * m.scale + m.padX;
     const hy = y + (head.y - m.minY) * m.scale + m.padY;
-    ctx.fillStyle = '#ffd166';
+    ctx.fillStyle = '#FFD400';
     ctx.beginPath();
     ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
     ctx.fill();
@@ -210,7 +210,7 @@ function _buildMinimap(track, w, h) {
 
   const center = track.centerLine || [];
   if (center.length) {
-    const colors = [track.accentColor || '#ffd166', track.sectors?.[0]?.color || '#2ec4b6', track.sectors?.[1]?.color || '#c77dff'];
+    const colors = [track.accentColor || '#FFD400', track.sectors?.[0]?.color || '#A8A8A3', track.sectors?.[1]?.color || '#6E6E69'];
     for (let s = 0; s < 3; s++) {
       const a = Math.floor(center.length * s / 3);
       const b = Math.floor(center.length * (s + 1) / 3);
@@ -269,7 +269,7 @@ function _speedometer(ctx, kmh, maxKmh, cx, cy) {
   const end    = start + ratio * Math.PI * 1.6;
   ctx.beginPath();
   ctx.arc(cx, cy, r - 4, start, end);
-  ctx.strokeStyle = ratio > 0.85 ? '#e63946' : '#2ec4b6';
+  ctx.strokeStyle = ratio > 0.85 ? '#FF453A' : '#FFD400';
   ctx.lineWidth = 6;
   ctx.stroke();
   const needle = start + ratio * Math.PI * 1.6;
@@ -279,7 +279,7 @@ function _speedometer(ctx, kmh, maxKmh, cx, cy) {
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx + Math.cos(needle) * (r - 11), cy + Math.sin(needle) * (r - 11));
   ctx.stroke();
-  ctx.fillStyle = '#2ec4b6';
+  ctx.fillStyle = '#FFD400';
   ctx.beginPath();
   ctx.arc(cx, cy, 4, 0, Math.PI * 2);
   ctx.fill();
@@ -297,7 +297,7 @@ function _speedometer(ctx, kmh, maxKmh, cx, cy) {
 function _rpmBar(ctx, ratio, x, y, w, h) {
   ctx.fillStyle = '#222';
   ctx.fillRect(x, y, w, h);
-  const color = ratio > 0.85 ? '#e63946' : ratio > 0.65 ? '#f4a261' : '#2ec4b6';
+  const color = ratio > 0.85 ? '#FF453A' : ratio > 0.65 ? '#FFD400' : '#A8A8A3';
   ctx.fillStyle = color;
   ctx.fillRect(x, y, w * ratio, h);
   ctx.strokeStyle = '#555';
@@ -315,10 +315,10 @@ function _boostMeter(ctx, car, x, y, w, h) {
   // background
   ctx.fillStyle = '#222';
   ctx.fillRect(x, y, w, h);
-  // fill (green at low, gold at high, magenta when actively boosting)
-  let col = '#5acdb3';
-  if (meter > 0.66) col = '#f0c060';
-  if (car.boosting) col = '#e040ff';
+  // fill (muted at low, yellow at high, bright yellow when actively boosting)
+  let col = '#A8A8A3';
+  if (meter > 0.66) col = '#FFD400';
+  if (car.boosting) col = '#FFD400';
   ctx.fillStyle = col;
   ctx.fillRect(x, y, w * meter, h);
   // outline
@@ -332,7 +332,7 @@ function _boostMeter(ctx, car, x, y, w, h) {
   ctx.fillText('BOOST', x, y - 2);
   // ready hint
   if ((car.boostMeter || 0) >= (car.boostCost || 38) && !car.boosting) {
-    ctx.fillStyle = '#9be9a8';
+    ctx.fillStyle = '#FFD400';
     ctx.textAlign = 'right';
     ctx.fillText('SHIFT', x + w, y - 2);
   }
@@ -341,15 +341,15 @@ function _boostMeter(ctx, car, x, y, w, h) {
 function _superBoostMeter(ctx, car, x, y, w, h) {
   const rawMeter = car.superBoostMeter ?? 100;
   const meter = Math.max(0, Math.min(100, rawMeter)) / 100;
-  ctx.fillStyle = '#111820';
+  ctx.fillStyle = '#1A1A1D';
   ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = car.drsActive ? '#53f7ff' : car.drsAvailable ? '#32d3ff' : '#355566';
+  ctx.fillStyle = car.drsActive ? '#FFD400' : car.drsAvailable ? '#C9A800' : '#2E2E33';
   ctx.fillRect(x, y, w * meter, h);
-  ctx.strokeStyle = car.drsAvailable ? '#7eefff' : '#3d4b55';
+  ctx.strokeStyle = car.drsAvailable ? '#6E6E69' : '#2E2E33';
   ctx.lineWidth = 1;
   ctx.strokeRect(x, y, w, h);
   ctx.font = '10px monospace';
-  ctx.fillStyle = car.drsAvailable ? '#9ff8ff' : '#7b8b92';
+  ctx.fillStyle = car.drsAvailable ? '#A8A8A3' : '#6E6E69';
   ctx.textAlign = 'left';
   ctx.fillText('DRX', x, y - 2);
   if (car.drsAvailable && !car.drsActive && rawMeter > 8) {
@@ -366,13 +366,13 @@ function _sectors(ctx, timing, x, y, canvasW) {
     const best = timing.sectorBest[i];
     let color = '#aaa';
     if (t !== null) {
-      color = (best && t <= best) ? '#c77dff' : '#4caf50';
+      color = (best && t <= best) ? '#FFD400' : '#A8A8A3';
     }
     ctx.font = '11px monospace';
     ctx.fillStyle = color;
     ctx.textAlign = 'left';
     ctx.fillText(`${labels[i]} ${t !== null ? formatTime(t) : '--:--.---'}`, x + dx, y);
-    ctx.fillStyle = '#7d8590';
+    ctx.fillStyle = '#6E6E69';
     ctx.fillText(`BEST ${best ? formatTime(best) : '--:--.---'}`, x + dx, y + 17);
     dx += 105;
   }
