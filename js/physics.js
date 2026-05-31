@@ -1,8 +1,8 @@
 import { clamp } from '../utils/math.js';
 
-export const TOP_SPEED_MULT = 2.08;
+export const TOP_SPEED_MULT = 2.25;
 export const KMH_PER_UNIT = 1;
-const ACCEL_MULT = 2.08;
+const ACCEL_MULT = 2.25;
 const BRAKE_MULT = 1.55;
 const DRAG_MULT = 1 / (TOP_SPEED_MULT * TOP_SPEED_MULT);
 const DRS_MIN_SPEED = 85;
@@ -54,11 +54,11 @@ export function updatePhysics(car, input, dt, track) {
   const handlingFactor = clamp((0.90 + (car.grip || 1.6) * 0.075) * (car.turnStrength || 1), 0.82, 1.34);
   const maxSpeed  = car.maxSpeed * TOP_SPEED_MULT
     * (1 + ((car.boostSpeedMult || 1.23) - 1) * boostPower)
-    * (1 + 0.28 * drsPower);
+    * (1 + 0.18 * drsPower);
   const massFactor = Math.pow(1200 / Math.max(650, car.mass || 1200), 0.28);
   const baseAccel = (40 + car.maxTorque * 0.105) * massFactor * powerFactor * ACCEL_MULT * (car.accelerationForce || 1)
-    * (1 + ((car.boostAccelMult || 1.35) - 1) * boostPower)
-    * (1 + 0.38 * drsPower);
+    * (1 + ((car.boostAccelMult || 1.55) - 1) * boostPower)
+    * (1 + 0.22 * drsPower);
   const brakeRate = baseAccel * BRAKE_MULT * handlingFactor * Math.pow(1250 / Math.max(700, car.mass || 1250), 0.1);
   const reverseTop = maxSpeed * 0.30;
   const turnPower = input.handbrake ? DRIFT_TURN_MULT : 1.30;
@@ -146,7 +146,7 @@ export function updatePhysics(car, input, dt, track) {
   car.drifting  = (input.handbrake && car.speed > MIN_DRIFT_SPEED && (Math.abs(sSpeed) > 1.4 || Math.abs(input.steer) > 0.03));
   if (car.drifting) {
     const driftIntensity = clamp(Math.abs(sSpeed) / 45, 0.25, 1.15);
-    car.boostMeter = Math.min(100, (car.boostMeter || 0) + dt * (car.boostChargeRate || 14) * 0.48 * driftIntensity);
+    car.boostMeter = Math.min(100, (car.boostMeter || 0) + dt * (car.boostChargeRate || 14) * 0.68 * driftIntensity);
   }
 
   // ── drag + rolling ──

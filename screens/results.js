@@ -74,7 +74,7 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
   if (leaderboardBtn) leaderboardBtn.onclick = () => document.getElementById('btn-open-leaderboard')?.click();
   if (submitBtn) {
     submitBtn.disabled = !shouldSaveOfficialRecord(mode);
-    submitBtn.textContent = shouldSaveOfficialRecord(mode) ? 'Retry Save' : 'Time Trial Only';
+    submitBtn.textContent = shouldSaveOfficialRecord(mode) ? '기록 저장' : '기록깨기 전용';
     submitBtn.onclick = () => submitCurrentResult({ submitBtn, statusEl, listEl, mode });
   }
   if (shareBtn) {
@@ -84,12 +84,7 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
       setStatus(statusEl, result.message);
     };
   }
-  if (rewardedBtn) {
-    rewardedBtn.onclick = () => {
-      trackEvent('rewarded_ad_click', { placement: 'game_over' });
-      showRewardedAd(() => console.log('Reward callback placeholder'));
-    };
-  }
+  if (rewardedBtn) rewardedBtn.hidden = true;
   showBannerAd('ad-game-over-banner');
   submitCurrentResult({ submitBtn, statusEl, listEl, mode, auto: true });
 }
@@ -151,20 +146,20 @@ async function submitCurrentResult({ submitBtn, statusEl, listEl, mode, auto = f
   if (resultSubmitted) return setStatus(statusEl, 'Record already saved');
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving...';
+    submitBtn.textContent = '저장 중...';
   }
   try {
     const result = await submitOfficialTimeTrialRecord(currentResult);
     resultSubmitted = true;
     renderLeaderboard(listEl, result.leaderboard || []);
-    setStatus(statusEl, result.onlineSaved ? 'Record saved' : 'Online save failed. Saved locally.');
-    if (submitBtn) submitBtn.textContent = 'Saved';
+    setStatus(statusEl, result.onlineSaved ? '기록 저장 완료' : '온라인 저장 실패 (로컬 저장됨)');
+    if (submitBtn) submitBtn.textContent = '저장됨';
   } catch {
     resultSubmitted = false;
     if (submitBtn) submitBtn.disabled = false;
-    setStatus(statusEl, auto ? 'Auto save failed. Tap Retry Save.' : 'Could not save record');
+    setStatus(statusEl, auto ? '자동 저장 실패. 재시도 버튼을 눌러주세요.' : '기록 저장 실패');
   } finally {
-    if (submitBtn && !resultSubmitted) submitBtn.textContent = 'Retry Save';
+    if (submitBtn && !resultSubmitted) submitBtn.textContent = '다시 저장';
   }
 }
 

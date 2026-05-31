@@ -933,7 +933,7 @@ const TOAST_DEDUPE_MS = 6000;
 function _wireGlobalCompletionToast() {
   subscribeLapCompletion(event => {
     if (!event) return;
-    const key = `${event.playerId}|${event.trackId}|${event.carId}|${event.lapMs}|${event.isLocal ? 'L' : 'R'}`;
+    const key = `${event.playerId}|${event.trackId}|${event.carId}|${event.lapMs}`;
     const now = Date.now();
     for (const [k, t] of recentToastKeys) {
       if (now - t > TOAST_DEDUPE_MS) recentToastKeys.delete(k);

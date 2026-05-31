@@ -242,7 +242,7 @@ select:focus-visible {
   min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(270px, 340px) 1fr minmax(260px, 340px);
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto 1fr auto;
   gap: 18px;
   padding: 22px;
   background:
@@ -439,6 +439,10 @@ select:focus-visible {
   transform: translate(-50%, 0);
 }
 .lobby-ad-hidden { display: none !important; }
+/* 로비에서 하단 배너 광고 숨김 - ad-lobby-side가 이미 모드 패널에 있음 */
+.hero-content.lobby-hub > #ad-main-menu-banner { display: none !important; }
+/* 랭킹 버튼 단독 배치 시 full-width */
+#btn-main-leaderboard { grid-column: 1 / -1; }
 .lobby-hub.panels-collapsed .lobby-car-panel,
 .lobby-hub.panels-collapsed .lobby-mode-panel,
 .lobby-hub.panels-collapsed .lobby-compact-board {
