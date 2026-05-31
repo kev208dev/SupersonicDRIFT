@@ -39,6 +39,28 @@ import { renderSeasonPanel, fetchSeasonLeaderboard } from './js/seasons.js';
 import { getRating, renderRatingBadge } from './js/rating.js';
 import { renderMissionPanel, updateMissionProgress } from './js/missions.js';
 
+// ── visible crash reporter ───────────────────────────────────
+// The 3D scene runs on the user's real GPU. If WebGL/THREE init throws on a
+// device, the canvas would otherwise just go black with no clue. Surface the
+// real error on screen so it can be diagnosed instead of a silent black screen.
+function showFatalError(label, error) {
+  try {
+    const msg = (error && (error.stack || error.message)) || String(error);
+    let box = document.getElementById('fatal-error-box');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'fatal-error-box';
+      box.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:99999;max-width:min(680px,92vw);max-height:42vh;overflow:auto;padding:14px 16px;background:rgba(120,12,12,0.95);color:#fff;font:12px/1.5 monospace;border:1px solid #ff6b6b;border-radius:10px;white-space:pre-wrap;box-shadow:0 10px 40px rgba(0,0,0,0.5)';
+      document.body.appendChild(box);
+    }
+    box.textContent = `⚠ ${label}\n${msg}`;
+  } catch {}
+  console.error(label, error);
+}
+window.addEventListener('error', (e) => showFatalError('Uncaught error', e.error || e.message));
+window.addEventListener('unhandledrejection', (e) => showFatalError('Unhandled promise rejection', e.reason));
+window.showFatalError = showFatalError;
+
 let currentScreen = 'main';
 let selectedCar   = null;
 let selectedSkin  = null;
@@ -164,8 +186,7 @@ function goToMain() {
   try {
     initLobbyPractice({ ...selectedCar, skin: selectedSkin });
   } catch (error) {
-    console.error('Practice lobby failed to start:', error);
-    hideRaceCanvas();
+    showFatalError('Practice lobby failed to start (initLobbyPractice)', error);
   }
   setMobileControlsVisible(true);
   showBannerAd('ad-main-menu-banner');
@@ -322,17 +343,21 @@ function goToMpGame(car, track, room, net, startAt, myClientId) {
   showRaceCanvas();
   setMobileControlsVisible(true);
   detachNet();
-  initMpGame({
-    car,
-    track,
-    net,
-    startAt,
-    lapTarget: room.lapTarget,
-    myClientId,
-    roomPlayers: room.players,
-    onFinish: (payload) => goToMpResults({ ...payload, mode: selectedMode, track, car }, net),
-    onLeave: () => { net.disconnect(); goToCarSelect(); },
-  });
+  try {
+    initMpGame({
+      car,
+      track,
+      net,
+      startAt,
+      lapTarget: room.lapTarget,
+      myClientId,
+      roomPlayers: room.players,
+      onFinish: (payload) => goToMpResults({ ...payload, mode: selectedMode, track, car }, net),
+      onLeave: () => { net.disconnect(); goToCarSelect(); },
+    });
+  } catch (error) {
+    showFatalError('Competition race failed to start (initMpGame)', error);
+  }
 }
 
 function goToMpResults(payload, net) {
@@ -404,12 +429,16 @@ function goToGame() {
   setMobileControlsVisible(true);
   initGameSceneOnce();
   const raceCar = { ...selectedCar, skin: selectedSkin };
-  initGame(
-    raceCar, selectedTrack,
-    (lapData) => { goToResults(lapData); },
-    ()        => { goToMain(); },
-    selectedRaceOptions
-  );
+  try {
+    initGame(
+      raceCar, selectedTrack,
+      (lapData) => { goToResults(lapData); },
+      ()        => { goToMain(); },
+      selectedRaceOptions
+    );
+  } catch (error) {
+    showFatalError('Race failed to start (initGame)', error);
+  }
 }
 
 function goToResults(lapData) {
