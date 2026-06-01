@@ -206,14 +206,16 @@ function renderLobbyHub() {
   if (badgeEl) badgeEl.textContent = 'SELECTED';
   if (statsEl) {
     const stats = car.stats || {};
+    // 정규화: 40~100 구간 → 0~100% 폭 (시각적 차이 극대화)
+    const norm = v => Math.round(Math.min(100, Math.max(4, ((Math.min(v, 100) - 40) / 60) * 100)));
     statsEl.innerHTML = [
-      ['Speed', stats.speed || Math.round((car.maxSpeed || 280) / 4)],
+      ['Speed',        stats.speed        || Math.round((car.maxSpeed || 280) / 4)],
       ['Acceleration', stats.acceleration || 70],
-      ['Handling', stats.handling || Math.round((car.grip || 1.6) * 42)],
+      ['Handling',     stats.handling     || Math.round((car.grip || 1.6) * 42)],
     ].map(([label, value]) => `
       <div class="lobby-stat-row">
         <span>${label}</span>
-        <i><em style="width:${Math.min(100, Math.max(8, value))}%"></em></i>
+        <i><em style="width:${norm(value)}%"></em></i>
         <b>${value}</b>
       </div>
     `).join('');
