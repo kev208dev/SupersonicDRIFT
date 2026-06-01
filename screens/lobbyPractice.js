@@ -411,8 +411,8 @@ function addLoopRing(target, x, z, angle) {
 
 function updateLobbyCamera(dt) {
   const speedN = Math.min(1, (car.speed || 0) / Math.max(1, (car.maxSpeed || 280) * TOP_SPEED_MULT));
-  const back = 98 + speedN * 30 + boostFlash * 20;
-  const height = 40 + speedN * 12;
+  const back = 72 + speedN * 22 + boostFlash * 16;
+  const height = 32 + speedN * 10;
   const lookAhead = 62 + speedN * 36;
   const targetX = car.x - Math.cos(car.angle) * back;
   const targetZ = -car.y + Math.sin(car.angle) * back;

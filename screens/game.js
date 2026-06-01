@@ -542,9 +542,9 @@ export function startRaceTimerAfterDelay(delayMs = START_DELAY_MS) {
 function _updateCamera(dt) {
   const isHigh = cameraMode === 'high';
   const isHood = cameraMode === 'hood';
-  const DIST       = isHigh ? 0 : isHood ? -8 : 104;
-  const HEIGHT     = isHigh ? 380 : isHood ? 13.5 : 46;
-  const LOOK_AHEAD = isHigh ? 20 : isHood ? 155 : 64;
+  const DIST       = isHigh ? 0 : isHood ? -8 : 76;
+  const HEIGHT     = isHigh ? 380 : isHood ? 13.5 : 36;
+  const LOOK_AHEAD = isHigh ? 20 : isHood ? 155 : 58;
 
   let dA = car.angle - _camAngle;
   while (dA >  Math.PI) dA -= Math.PI * 2;
