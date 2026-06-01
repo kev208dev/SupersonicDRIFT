@@ -6,7 +6,7 @@ const justReleased = {};
 const bufferedPress = {};
 let lastShiftTapAt = 0;
 const SHIFT_DOUBLE_TAP_MS = 360;
-const PRESS_BUFFER_MS = 140;
+const PRESS_BUFFER_MS = 220;
 
 window.addEventListener('keydown', e => {
   if (_isEditableTarget(e.target)) return;
@@ -70,7 +70,7 @@ export function clearFrameKeys() {
 
 export function getInput() {
   const mobile = getMobileInput();
-  const throttle = (keys['KeyW'] || keys['ArrowUp'] || mobile.throttle) ? 1 : 0;
+  const throttle = (keys['KeyW'] || keys['ArrowUp'] || keys['Enter'] || mobile.throttle) ? 1 : 0;
   const brake    = (keys['KeyS'] || keys['ArrowDown'])  ? 1 : 0;
   const keyboardSteer = ((keys['KeyD'] || keys['ArrowRight']) ? 1 : 0)
                       - ((keys['KeyA'] || keys['ArrowLeft'])  ? 1 : 0);
