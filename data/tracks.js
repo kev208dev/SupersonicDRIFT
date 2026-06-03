@@ -138,7 +138,7 @@ function makeOfficialCircuit({
   info = {},
 }) {
   const center = buildSourceCenterline(trace, sourceSize, scale);
-  const raceWidth = Math.round(width * 1.65);
+  const raceWidth = Math.round(width * 1.30);
   const { outer, inner } = offsetWalls(center, raceWidth);
 
   const N = center.length;

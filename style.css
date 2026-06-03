@@ -1628,7 +1628,7 @@ select:focus-visible {
 }
 #mp-minimap {
   position: fixed;
-  top: 16px;
+  top: 70px;
   right: 16px;
   z-index: 50;
   width: 190px;
@@ -2293,7 +2293,7 @@ select:focus-visible {
 .spectator-hud {
   position: fixed;
   right: 16px;
-  top: 16px;
+  top: 70px;
   z-index: 52;
   border: 1px solid rgba(255,255,255,0.14);
   border-radius: 10px;
@@ -2302,7 +2302,7 @@ select:focus-visible {
 }
 .race-minimap canvas { display: block; width: 190px; height: 132px; }
 .spectator-hud {
-  top: 156px;
+  top: 214px;
   color: #F5F5F4;
   padding: 8px;
 }

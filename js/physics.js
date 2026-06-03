@@ -1,6 +1,6 @@
 import { clamp } from '../utils/math.js';
 
-export const TOP_SPEED_MULT = 2.32;
+export const TOP_SPEED_MULT = 2.60;
 export const KMH_PER_UNIT = 1;
 const ACCEL_MULT = 2.32;
 const BRAKE_MULT = 1.55;
