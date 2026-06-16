@@ -150,7 +150,7 @@
             </section>
             <section id="season-panel" class="season-panel lobby-mini-panel"></section>
             <section id="mission-panel" class="mission-panel lobby-mini-panel"></section>
-            <div class="lobby-control-hint">WASD/방향키 주행 · Space 드리프트 · Enter/E 더블드리프트 · Shift 부스트 · R 리스폰 · 맵 전환으로 점프코스 전환 · ESC 패널 숨김</div>
+            <div class="lobby-control-hint">WASD/방향키 주행 · Shift 드리프트 · Ctrl/Alt/Space 부스터·아이템 · Z/X 아이템 변경 · R 리스폰 · / 후방 · Tab 기록 · Enter 채팅</div>
             <div id="ad-main-menu-banner" class="ad-placeholder">
               <span>Advertisement</span><small>Ad Space</small>
             </div>
@@ -173,7 +173,7 @@
             </p>
             <ul class="control-list">
               <li><b>Mobile:</b> Joystick steer, Drift slide, Double Drift chained turn, Boost burst.</li>
-              <li><b>PC:</b> W/Arrow Up accelerate, A/D steer, S brake, Space drift, E double drift, Shift boost.</li>
+              <li><b>PC:</b> W/Arrow Up accelerate, A/D steer, S brake, Shift drift, Ctrl/Alt/Space boost or item, Z/X swap item, R respawn, / rear view, Tab records, Enter chat.</li>
             </ul>
           </article>
           <article id="privacy-policy">
@@ -223,7 +223,7 @@
           <article>
             <h2>PC Controls</h2>
             <p>W / Arrow Up accelerate. A/D or arrows steer. S / Arrow Down brakes.</p>
-            <p>Space or Enter drift. E double drifts. Shift boosts.</p>
+            <p>Shift drifts (hold through corners). Ctrl, Alt, or Space fires boost or item. Z/X cycles items. R respawns at the centerline. / shows rear view. Tab shows records. Enter opens chat.</p>
           </article>
           <article>
             <h2>Race Tips</h2>
@@ -514,10 +514,11 @@
 
     <!-- Controls hint overlay (game only) -->
     <div id="controls-hint" style="display: none">
-      <span>W/S: Accelerate / Brake</span><span>A/D: Steer</span>
-      <span>SPACE/ENTER: Drift</span><span>E: Double Drift</span>
-      <span>SHIFT: Boost</span><span>R: Restart</span>
-      <span>C: Camera</span><span>ESC: Menu</span>
+      <span>↑↓ W/S: 가속/브레이크</span><span>←→ A/D: 좌우</span>
+      <span>SHIFT: 드리프트</span><span>CTRL/ALT/SPACE: 부스터·아이템</span>
+      <span>Z/X: 아이템 변경</span><span>R: 리스폰</span>
+      <span>/: 후방</span><span>TAB: 기록</span>
+      <span>ENTER: 채팅</span><span>C: 카메라</span><span>ESC: 메뉴</span>
     </div>
 
     <div id="mobile-controls" class="mobile-controls hidden" aria-hidden="true">
@@ -570,15 +571,15 @@
           <div class="help-card">
             <div class="help-card-icon">🌀</div>
             <div class="help-card-label">드리프트</div>
-            <div class="help-key-row"><kbd>SPACE</kbd> 드리프트 (홀드)</div>
-            <div class="help-key-row"><kbd>ENTER</kbd><kbd>E</kbd> 더블 드리프트</div>
-            <div class="help-key-tip">코너 직전에 더블 드리프트!</div>
+            <div class="help-key-row"><kbd>SHIFT</kbd> 드리프트 (홀드)</div>
+            <div class="help-key-row">방향키 톡톡 → 톡톡이 자동 감지</div>
+            <div class="help-key-tip">코너 직전에 SHIFT 누른 채로 꺾기</div>
           </div>
           <div class="help-card">
             <div class="help-card-icon">⚡</div>
-            <div class="help-card-label">부스트</div>
-            <div class="help-key-row"><kbd>SHIFT</kbd> 부스트 발동</div>
-            <div class="help-key-tip">드리프트로 게이지 충전 후 직선에서 사용</div>
+            <div class="help-card-label">부스터·아이템</div>
+            <div class="help-key-row"><kbd>CTRL</kbd><kbd>ALT</kbd><kbd>SPACE</kbd> 발동</div>
+            <div class="help-key-tip">드리프트 게이지 충전 후 직선에서 사용</div>
           </div>
           <div class="help-card">
             <div class="help-card-icon">🎮</div>

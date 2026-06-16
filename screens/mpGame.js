@@ -46,6 +46,7 @@ let running = false;
 let hudCanvas = null;
 let hudCtx = null;
 let cameraMode = 'chase';
+let rearViewActive = false;
 
 let smokePool = null;
 let skidBuf = null;
@@ -124,7 +125,7 @@ export function initMpGame({
   scene.fog = new THREE.Fog(0x87ceeb, 9000, 22000);
 
   camera3d = new THREE.PerspectiveCamera(
-    64, window.innerWidth / window.innerHeight, 1, 26000
+    72, window.innerWidth / window.innerHeight, 1, 26000
   );
   const startPos = track.startPos || { x: 0, y: 0, angle: 0 };
   const sa = startPos.angle;
@@ -235,6 +236,7 @@ export function updateMpGame(dt, now) {
   if (input.cameraToggle) {
     cameraMode = CAMERA_MODES[(CAMERA_MODES.indexOf(cameraMode) + 1) % CAMERA_MODES.length];
   }
+  rearViewActive = !!input.rearView;
   if (input.escape) {
     stopMpGame();
     if (onLeaveCb) onLeaveCb();
@@ -571,8 +573,16 @@ function _emitDriftFx(dt, driveInput) {
 function _updateCamera(dt) {
   const isHigh = cameraMode === 'high';
   const isHood = cameraMode === 'hood';
-  const DIST = isHigh ? 0 : isHood ? -8 : 104;
-  const HEIGHT = isHigh ? 380 : isHood ? 13.5 : 46;
+
+  // KartRider 연출
+  const boostPow = Math.min(1, car.boostPower || 0);
+  const BOOST_DIST_PULL   = 0.17;
+  const BOOST_HEIGHT_DROP = 6;
+  const distMul = (isHigh || isHood) ? 1 : (1 - BOOST_DIST_PULL * boostPow);
+  const heightDrop = (isHigh || isHood) ? 0 : BOOST_HEIGHT_DROP * boostPow;
+
+  const DIST = (isHigh ? 0 : isHood ? -8 : 104) * distMul;
+  const HEIGHT = (isHigh ? 380 : isHood ? 13.5 : 46) - heightDrop;
   const LOOK_AHEAD = isHigh ? 20 : isHood ? 155 : 64;
 
   let dA = car.angle - _camAngle;
@@ -581,8 +591,15 @@ function _updateCamera(dt) {
   const angK = 1 - Math.exp(-9.0 * dt);
   _camAngle += dA * angK;
 
-  const a = _camAngle;
-  const cs = Math.cos(a), sn = Math.sin(a);
+  // 드리프트 카메라 yaw
+  const driftYawTarget = car.drifting
+    ? Math.max(-0.26, Math.min(0.26, -(car.driftAngle || 0) * 0.55))
+    : 0;
+  car._camDriftYaw = (car._camDriftYaw || 0)
+    + (driftYawTarget - (car._camDriftYaw || 0)) * (1 - Math.exp(-8.0 * dt));
+  const rearFlip = rearViewActive ? Math.PI : 0;
+  const aimAngle = _camAngle + car._camDriftYaw + rearFlip;
+  const cs = Math.cos(aimAngle), sn = Math.sin(aimAngle);
   const roadY = car.roadHeight || 0;
 
   const tx = car.x - cs * DIST;

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildDesertWalls } from './desertTheme.js';
 
 export function getTrackGroup(track, scene) {
   const grp = _buildTrackGroup(track);
@@ -31,6 +32,9 @@ function _buildTrackGroup(track) {
 
   _addStartGrid(grp, track.startPos, track);
   _addBoostPads(grp, track);
+
+  // ── 사막 테마: 양옆 수직 사암 벽 (시야 차단 → 좁고 빠른 느낌) ──
+  grp.add(buildDesertWalls(track));
   return grp;
 }
 

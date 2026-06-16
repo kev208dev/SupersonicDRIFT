@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createCar, createCar3D, updateCar3D } from '../js/car.js';
-import { updatePhysics, KMH_PER_UNIT, TOP_SPEED_MULT }  from '../js/physics.js';
+import { updatePhysics, KMH_PER_UNIT, TOP_SPEED_MULT, respawnAtCenter }  from '../js/physics.js';
 import { getTrackGroup }  from '../js/track3d.js';
 import { drawHUD }        from '../js/hud.js';
 import { createTiming, startTiming, updateTiming } from '../js/timing.js';
@@ -43,6 +43,7 @@ let hudCanvas = null;
 let hudCtx    = null;
 let cameraMode = 'chase'; // 'chase' | 'hood' | 'high'
 const CAMERA_MODES = ['chase', 'hood', 'high'];
+let rearViewActive = false; // '/' 누르고 있는 동안 true
 
 // fx
 let smokePool = null;
@@ -131,7 +132,7 @@ export function initGame(cd, tr, resultsCb, menuCb, options = {}) {
 
   // ── camera ──
   camera3d = new THREE.PerspectiveCamera(
-    64, window.innerWidth / window.innerHeight, 1, 26000
+    72, window.innerWidth / window.innerHeight, 1, 26000
   );
   const startPos = tr.startPos || { x: 0, y: 0, angle: 0 };
   const sa = startPos.angle;
@@ -235,7 +236,8 @@ export function updateGame(dt, now) {
   if (input.cameraToggle) {
     cameraMode = CAMERA_MODES[(CAMERA_MODES.indexOf(cameraMode) + 1) % CAMERA_MODES.length];
   }
-  if (input.reset) restartRaceWithCountdown();
+  rearViewActive = !!input.rearView;
+  if (input.reset) respawnAtCenter(car, track); // R: 위치 리스폰 (타이머 유지)
   if (input.escape) { stopGame(); if (onMenu) onMenu(); return; }
 
   startCountdown = Math.max(0, (startReadyAt - now) / 1000);
@@ -564,8 +566,16 @@ function _tickBoostPads(dt) {
 function _updateCamera(dt) {
   const isHigh = cameraMode === 'high';
   const isHood = cameraMode === 'hood';
-  const DIST       = isHigh ? 0 : isHood ? -8 : 76;
-  const HEIGHT     = isHigh ? 380 : isHood ? 13.5 : 36;
+
+  // KartRider 연출: boost 中 카메라 거리/높이 당김
+  const boostPow = Math.min(1, car.boostPower || 0);
+  const BOOST_DIST_PULL   = 0.17;
+  const BOOST_HEIGHT_DROP = 5;
+  const distMul = (isHigh || isHood) ? 1 : (1 - BOOST_DIST_PULL * boostPow);
+  const heightDrop = (isHigh || isHood) ? 0 : BOOST_HEIGHT_DROP * boostPow;
+
+  const DIST       = (isHigh ? 0 : isHood ? -8 : 76) * distMul;
+  const HEIGHT     = (isHigh ? 380 : isHood ? 13.5 : 36) - heightDrop;
   const LOOK_AHEAD = isHigh ? 20 : isHood ? 155 : 58;
 
   let dA = car.angle - _camAngle;
@@ -574,8 +584,16 @@ function _updateCamera(dt) {
   const angK = 1 - Math.exp(-9.0 * dt);
   _camAngle += dA * angK;
 
-  const a  = _camAngle;
-  const cs = Math.cos(a), sn = Math.sin(a);
+  // 드리프트 카메라: 미끄러지는 반대로 ~15° yaw
+  const driftYawTarget = car.drifting
+    ? Math.max(-0.26, Math.min(0.26, -(car.driftAngle || 0) * 0.55))
+    : 0;
+  car._camDriftYaw = (car._camDriftYaw || 0)
+    + (driftYawTarget - (car._camDriftYaw || 0)) * (1 - Math.exp(-8.0 * dt));
+  // 후방 보기: '/' 누른 동안 카메라 좌우 반전
+  const rearFlip = rearViewActive ? Math.PI : 0;
+  const aimAngle = _camAngle + car._camDriftYaw + rearFlip;
+  const cs = Math.cos(aimAngle), sn = Math.sin(aimAngle);
   const roadY = car.roadHeight || 0;
 
   const tx = car.x - cs * DIST;

@@ -263,12 +263,12 @@ export function drawSpeedLines(ctx, lines, kmh, w, h, dt, cameraMode = 'chase') 
     for (const p of lines) p.life = 0;
     return;
   }
-  // Activate earlier so the player feels speed sooner.
-  if (kmh < 45) {
+  // KartRider 연출: ~60 m/s (≈216 km/h) 이상에서 강하게 발동.
+  if (kmh < 160) {
     for (const p of lines) p.life = 0;
     return;
   }
-  const intensity = Math.min(1, (kmh - 45) / 190);
+  const intensity = Math.min(1, (kmh - 160) / 130);
   const cx = w * 0.5, cy = h * 0.58;
   const speedScale = 1500 + intensity * 3200;
   const spawnRate  = boostActiveRate(kmh) + intensity * 180;
@@ -323,16 +323,16 @@ function boostActiveRate(kmh) {
   return kmh > 180 ? 105 : 70;
 }
 
-// ── FOV pump (camera lerps from base FOV up to base+boost) ───────────
+// ── FOV pump (KartRider 원작형: 72 → 92, in 0.3s / out 0.5s) ─────────
+//   부스트 발동 순간 화면이 "확" 벌어지는 게 손맛의 정체.
+//   signature는 upstream 호환 유지 (kmh/maxKmh 인자는 unused).
 export function updateFovPump(camera, kmh, maxKmh, boostActive, dt) {
-  const baseFov  = 66;
-  const speedFovBoost = 38;
-  const boostFov = 102;
-  const t = Math.min(1, kmh / maxKmh);
-  // Quadratic so the pump kicks in harder at high speed.
-  let target = baseFov + (t * t) * speedFovBoost;
-  if (boostActive) target = Math.max(target, boostFov);
-  const k = 1 - Math.exp(-5.4 * dt);
+  const BASE_FOV  = 72;
+  const BOOST_FOV = 92;
+  const target = boostActive ? BOOST_FOV : BASE_FOV;
+  // τ초에 95% 도달 (1 - e^-3 ≈ 0.95)
+  const tau = (target > camera.fov) ? 0.30 : 0.50;
+  const k = 1 - Math.exp(-(3.0 / tau) * dt);
   camera.fov += (target - camera.fov) * k;
   camera.updateProjectionMatrix();
 }

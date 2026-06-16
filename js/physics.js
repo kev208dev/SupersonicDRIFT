@@ -1,203 +1,116 @@
-import { clamp } from '../utils/math.js';
+// KartRider 원작형 주행 메커니즘. 코어는 kart-boost/ 모듈이 담당.
+// 이 파일은 wrapper: kart drift → collision → gear/RPM/HUD 보조.
 
-export const TOP_SPEED_MULT = 2.95;
-export const KMH_PER_UNIT = 1;
-const ACCEL_MULT = 2.32;
-const BRAKE_MULT = 1.55;
-const DRAG_MULT = 1 / (TOP_SPEED_MULT * TOP_SPEED_MULT);
-const DRS_MIN_SPEED = 85;
+import { clamp } from '../utils/math.js';
+import {
+  stepKartDrift,
+  initKartState,
+  MIN_DRIFT_SPEED as KART_MIN_DRIFT_SPEED,
+  DOUBLE_DRIFT_MIN_SPEED as KART_DOUBLE_DRIFT_MIN_SPEED,
+} from '../kart-boost/index.js';
+
+export const TOP_SPEED_MULT = 1.0; // kart 모델은 car.maxSpeed 자체를 cruise cap으로 사용
+export const KMH_PER_UNIT   = 1;
+export const MIN_DRIFT_SPEED = KART_MIN_DRIFT_SPEED;
+export const DOUBLE_DRIFT_MIN_SPEED = KART_DOUBLE_DRIFT_MIN_SPEED;
+
+// ─── 위치 리스폰: 가장 가까운 centerLine 세그먼트 한가운데로 스냅 ───
+// 벽 끼임 해제용. 타이머/랩 안 건드림.
+export function respawnAtCenter(car, track) {
+  const cl = track?.centerLine || [];
+  if (!cl.length) return;
+  let best = { d2: Infinity, px: car.x, py: car.y, ex: 1, ey: 0 };
+  for (let i = 0; i < cl.length; i++) {
+    const [x1, y1] = cl[i];
+    const [x2, y2] = cl[(i + 1) % cl.length];
+    const ex = x2 - x1, ey = y2 - y1;
+    const len2 = ex * ex + ey * ey || 1;
+    const t = Math.max(0, Math.min(1, ((car.x - x1) * ex + (car.y - y1) * ey) / len2));
+    const px = x1 + ex * t, py = y1 + ey * t;
+    const d2 = (car.x - px) ** 2 + (car.y - py) ** 2;
+    if (d2 < best.d2) best = { d2, px, py, ex, ey };
+  }
+  car.x = best.px;
+  car.y = best.py;
+  car.angle = Math.atan2(best.ey, best.ex);
+  car.vx = 0; car.vy = 0; car.speed = 0;
+  car.steerAngle = 0;
+  car.drifting = false;
+  car.driftState = 'idle';
+  car.driftStateTime = 0;
+  car.driftAngle = 0;
+  car.boostSustainTimer = 0;
+  car.boostCapDecayTimer = 0;
+  car.boosting = false;
+  car.boostPower = 0;
+  car.boostFireFx = 0;
+  car.offTrack = false;
+  car.wallRiding = false;
+  car.lastWallHit = null;
+}
+
 const WALL_RIDE_TURN_MIN = 0.105;
-const WALL_RIDE_EXTRA = 7;
+const WALL_RIDE_EXTRA    = 7;
 const WALL_RIDE_MIN_SPEED = 58;
 const COLLISION_EDGE_GRACE = 24;
-const OFF_ROAD_GRACE = 18;
-const STRAIGHT_DRIFT_STEER_MAX = 0.24;
-const STRAIGHT_DRIFT_SLIP_MAX = 0.16;
-const TOP_GEAR_REDLINE_MIN = 0.56;
-const TOP_GEAR_REDLINE_MAX = 0.65;
-const DRIFT_TURN_MULT = 1.42;
-const DOUBLE_DRIFT_PENDING_SEC = 0.42;
-const DOUBLE_DRIFT_MIN_STEER = 0.025;
-export const MIN_DRIFT_SPEED = 8;
-export const DOUBLE_DRIFT_MIN_SPEED = 8;
-const DOUBLE_DRIFT_ANGLE = Math.PI * 0.42;
-const DOUBLE_DRIFT_DURATION = 0.24;
-const DOUBLE_DRIFT_BOOST_GAIN = 18;
+const OFF_ROAD_GRACE       = 18;
 
-// Per-gear "top speed" — speed at which RPM hits maxRpm in that gear.
-const GEAR_TOP = [0, 48, 82, 120, 162, 208, 258, 305, 355];
-// Acceleration multiplier per gear (low gears = more torque).
-const GEAR_ACCEL = [0, 1.12, 1.02, 0.92, 0.80, 0.68, 0.57, 0.48, 0.40];
-
-const SHIFT_UP_RPM   = 0.92; // ratio of maxRpm to auto-upshift
-const SHIFT_DOWN_RPM = 0.32; // ratio of maxRpm to auto-downshift
-const REV_LIMIT_TIME = 0.08; // sec the throttle is starved on hitting limiter
+const SHIFT_UP_RPM   = 0.92;
+const SHIFT_DOWN_RPM = 0.32;
+const GEAR_TOP   = [0, 48, 82, 120, 162, 208, 258, 305, 355];
 
 export function updatePhysics(car, input, dt, track) {
   if (dt <= 0) return;
   if (dt > 0.05) dt = 0.05;
 
-  // ── transmission mode toggle ──
-  if (input.autoToggle) {
-    car.transmission = (car.transmission === 'manual') ? 'auto' : 'manual';
+  if (!car._kartInited) {
+    initKartState(car);
+    car._kartInited = true;
   }
 
-  // ── boost state machine ──
-  _updateDrs(car, input, track, dt);
-  _updateBoost(car, input, dt);
+  // ─── 1. KartRider 주행: 마찰 분리 + 드리프트 상태머신 + 부스트 폭발 ───
+  stepKartDrift(car, input, dt);
 
-  // ── derived car limits (boost-modulated) ──
-  const boostPower = clamp(car.boostPower || 0, 0, 1);
-  const drsPower = clamp(car.drsPower || 0, 0, 1);
-  const powerToWeight = (car.power || car.maxTorque || 520) / Math.max(650, car.mass || 1200);
-  const powerFactor = clamp(0.84 + powerToWeight * 0.58, 0.92, 1.55);
-  const handlingFactor = clamp((0.90 + (car.grip || 1.6) * 0.075) * (car.turnStrength || 1), 0.82, 1.34);
-  const maxSpeed  = car.maxSpeed * TOP_SPEED_MULT
-    * (1 + ((car.boostSpeedMult || 1.23) - 1) * boostPower)
-    * (1 + 0.18 * drsPower);
-  const massFactor = Math.pow(1200 / Math.max(650, car.mass || 1200), 0.28);
-  const baseAccel = (40 + car.maxTorque * 0.105) * massFactor * powerFactor * ACCEL_MULT * (car.accelerationForce || 1)
-    * (1 + ((car.boostAccelMult || 1.55) - 1) * boostPower)
-    * (1 + 0.22 * drsPower);
-  const brakeRate = baseAccel * BRAKE_MULT * handlingFactor * Math.pow(1250 / Math.max(700, car.mass || 1250), 0.1) * (car.brakePower || 1);
-  const reverseTop = maxSpeed * 0.30;
-  const turnPower = input.handbrake ? DRIFT_TURN_MULT * (car.driftPower || 1) : 1.30;
-
-  car.gear = clamp(car.gear || 1, 1, 8);
-  const accelRate = baseAccel * GEAR_ACCEL[car.gear];
-
-  // ── steering ── (negate so D = right turn)
-  const speedRatio  = clamp(car.speed / maxSpeed, 0, 1);
-  const maxWheel    = (0.72 - speedRatio * 0.28) * handlingFactor;
-  const targetWheel = -input.steer * maxWheel;
-  car.steerAngle += (targetWheel - car.steerAngle) * Math.min(dt * (input.handbrake ? 9.2 : 5.8), 1);
-
-  const fwdX     = Math.cos(car.angle);
-  const fwdY     = Math.sin(car.angle);
-  const fwdSpeed = car.vx * fwdX + car.vy * fwdY;
-
-  // ── shift inputs (Q up / E down; auto-switch to manual on use) ──
+  // ─── 2. 수동 기어 입력 (HUD 보조) ───
   if (input.gearUp) {
     car.transmission = 'manual';
     if (car.gear < 8) car.gear += 1;
   }
   if (input.gearDown) {
     car.transmission = 'manual';
-    if (car.gear > 1) {
-      const newTop = _gearTop(car.gear - 1, car);
-      if ((car.speed / newTop) < 1.05) car.gear -= 1;
-    }
+    if (car.gear > 1) car.gear -= 1;
   }
 
-  // ── rev-limiter timer ──
-  car.revLimitTimer = Math.max(0, (car.revLimitTimer || 0) - dt);
-  const revLimited = car.revLimitTimer > 0;
-
-  // ── throttle / brake / reverse ──
-  if (input.throttle > 0 && !revLimited) {
-    car.vx += fwdX * accelRate * input.throttle * dt;
-    car.vy += fwdY * accelRate * input.throttle * dt;
-  }
-  if (input.brake > 0) {
-    if (fwdSpeed > 1.0) {
-      const sp  = Math.hypot(car.vx, car.vy);
-      const dec = brakeRate * input.brake * dt;
-      const k   = Math.min(dec / sp, 1);
-      car.vx -= car.vx * k;
-      car.vy -= car.vy * k;
-    } else if (input.throttle === 0) {
-      if (fwdSpeed > -reverseTop) {
-        car.vx -= fwdX * baseAccel * 0.34 * input.brake * dt;
-        car.vy -= fwdY * baseAccel * 0.34 * input.brake * dt;
-      }
-    }
-  }
-
-  // ── yaw ──
-  car.speed = Math.hypot(car.vx, car.vy);
-  if (car.speed > 0.5) {
-    const dirSign  = fwdSpeed >= 0 ? 1 : -1;
-    const turnGain = (0.36 + speedRatio * 0.50) * turnPower * handlingFactor;
-    car.angle += car.steerAngle * turnGain * dirSign * dt;
-    if (input.handbrake && Math.abs(input.steer) > 0.05) {
-      car.angle += -input.steer * (0.10 + speedRatio * 0.18) * dt * dirSign;
-    }
-  }
-
-  // ── KartRider-style drift impulse on space tap / double-tap ──
-  _applyDriftImpulse(car, input, dt);
-
-  // ── lateral grip + drift detection ──
-  car.speed = Math.hypot(car.vx, car.vy);
-  let sSpeed = 0;
-  if (car.speed > 0.2) {
-    const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
-    const sx = -fy,                  sy =  fx;
-    const fSpeed = car.vx * fx + car.vy * fy;
-    sSpeed = car.vx * sx + car.vy * sy;
-    // Looser grip while handbraking → drift; snap back hard on release.
-    const decay  = input.handbrake ? 0.004 : (22 + car.grip * 4.0);
-    const sNew   = sSpeed * Math.exp(-decay * dt);
-    car.vx = fx * fSpeed + sx * sNew;
-    car.vy = fy * fSpeed + sy * sNew;
-  }
-  car.sideSpeed = sSpeed;
-  _applyStraightDriftBrake(car, input, dt, sSpeed);
-  car.drifting  = (input.handbrake && car.speed > MIN_DRIFT_SPEED && (Math.abs(sSpeed) > 1.4 || Math.abs(input.steer) > 0.03));
-  if (car.drifting) {
-    const driftIntensity = clamp(Math.abs(sSpeed) / 45, 0.25, 1.15);
-    car.boostMeter = Math.min(100, (car.boostMeter || 0) + dt * (car.boostChargeRate || 14) * 0.68 * driftIntensity);
-  }
-
-  // ── drag + rolling ──
-  car.speed = Math.hypot(car.vx, car.vy);
-  if (car.speed > 0.05) {
-    const dragDec = car.speed * car.speed * 0.00265 * DRAG_MULT + 12.0;
-    const k       = Math.min((dragDec * dt) / car.speed, 1);
-    car.vx -= car.vx * k;
-    car.vy -= car.vy * k;
-  } else {
-    car.vx = 0; car.vy = 0;
-  }
-
-  // ── top-speed cap ──
-  car.speed = Math.hypot(car.vx, car.vy);
-  if (car.speed > maxSpeed) {
-    const k = maxSpeed / car.speed;
-    car.vx *= k; car.vy *= k;
-    car.speed = maxSpeed;
-  }
-
-  // ── RPM from gear band ──
-  const gearTop  = _gearTop(car.gear, car);
-  const sNorm    = car.speed / gearTop;
-  car.rpm = clamp(1000 + sNorm * (car.maxRpm - 1000), 800, car.maxRpm * 1.10);
-
-  // ── auto-shift OR manual rev limiter ──
-  const upRpm   = car.maxRpm * SHIFT_UP_RPM;
-  const downRpm = car.maxRpm * SHIFT_DOWN_RPM;
-  if (car.transmission !== 'manual') {
-    if (car.rpm > upRpm   && car.gear < 8) car.gear += 1;
-    if (car.rpm < downRpm && car.gear > 1) car.gear -= 1;
-  } else {
-    if (car.rpm >= car.maxRpm * 1.02) {
-      car.revLimitTimer = REV_LIMIT_TIME;
-      car.rpm = car.maxRpm;
-    }
-  }
-
-  // ── move + 4-corner wall collision ──
+  // ─── 3. 충돌 (4-corner wall) ───
   _moveWithCollisionSubsteps(car, dt, track);
   car.speed = Math.hypot(car.vx, car.vy);
+
+  // ─── 4. RPM / 기어 (HUD/사운드 보조) ───
+  const maxCruise = Math.max(120, car.maxSpeed || 180);
+  const sNorm = clamp(car.speed / maxCruise, 0, 1.4);
+  if (car.transmission !== 'manual') {
+    car.gear = clamp(Math.ceil(sNorm * 6) + 1, 1, 8);
+  } else {
+    car.gear = clamp(car.gear || 1, 1, 8);
+  }
+  car.rpm = clamp(1000 + sNorm * ((car.maxRpm || 8000) - 1000), 800, (car.maxRpm || 8000) * 1.05);
+
+  // ─── 5. DRS off (kart 부스트가 대체) ───
+  car.drsActive    = false;
+  car.drsAvailable = false;
+  car.drsPower     = (car.drsPower || 0) * Math.exp(-6 * dt);
+  car.superBoostMeter = 100;
 }
 
-// Car corners (mesh-local x, z) — match wheel positions in car.js so the
-// hitbox actually covers what the player sees on screen.
+// ───────────────────────────────────────────────────────────────
+//  Collision (upstream 그대로)
+// ───────────────────────────────────────────────────────────────
+
 const CAR_CORNERS = [
-  [ 11,   8],  // FL
-  [ 11,  -8],  // FR
-  [-10,   8],  // RL
-  [-10,  -8],  // RR
+  [ 11,   8],
+  [ 11,  -8],
+  [-10,   8],
+  [-10,  -8],
 ];
 
 const _trackCollisionCaches = new WeakMap();
@@ -279,8 +192,6 @@ function _resolveCollision(car, nextX, nextY, track) {
     car.wallRiding = wallRiding;
     car.wallRideSide = Math.sign(rideSide) || car.wallRideSide || 0;
 
-    // Corner wall-ride banks preserve the tangent speed and only bleed the
-    // outward shove, so the player can brush the structure instead of stopping.
     const nl = Math.hypot(aggrNx, aggrNy) || 1;
     const nx = aggrNx / nl;
     const ny = aggrNy / nl;
@@ -308,138 +219,6 @@ function _resolveCollision(car, nextX, nextY, track) {
     car.x = fx;
     car.y = fy;
   }
-}
-
-function _applyDriftImpulse(car, input, dt) {
-  // E / mobile double-drift fires the burst impulse; intent is buffered so steering/speed
-  // can ramp up after the press without losing the input.
-  if (input.driftBurst) {
-    car.driftImpulsePending = DOUBLE_DRIFT_PENDING_SEC;
-    if (!input._driftBurstBoostApplied) {
-      car.boostMeter = Math.min(100, (car.boostMeter || 0) + DOUBLE_DRIFT_BOOST_GAIN);
-      input._driftBurstBoostApplied = true;
-    }
-  }
-  car.driftImpulsePending = Math.max(0, (car.driftImpulsePending || 0) - dt);
-
-  if (car.driftImpulsePending > 0
-    && Math.abs(input.steer) > DOUBLE_DRIFT_MIN_STEER
-    && car.speed > DOUBLE_DRIFT_MIN_SPEED
-    && Math.abs(car.driftImpulse || 0) < 0.0005) {
-    const magnitude = DOUBLE_DRIFT_ANGLE;
-    const duration  = DOUBLE_DRIFT_DURATION;
-    const fwdX = Math.cos(car.angle);
-    const fwdY = Math.sin(car.angle);
-    const fwdSpeed = car.vx * fwdX + car.vy * fwdY;
-    const dirSign = fwdSpeed >= 0 ? 1 : -1;
-    car.driftImpulse = -Math.sign(input.steer) * magnitude * dirSign;
-    car.driftImpulseRate = car.driftImpulse / duration;
-    car.driftImpulsePending = 0;
-  }
-  if (Math.abs(car.driftImpulse || 0) > 0.0005) {
-    const step = (car.driftImpulseRate || 0) * dt;
-    if (Math.abs(step) >= Math.abs(car.driftImpulse)) {
-      car.angle += car.driftImpulse;
-      car.driftImpulse = 0;
-      car.driftImpulseRate = 0;
-    } else {
-      car.angle += step;
-      car.driftImpulse -= step;
-    }
-  }
-}
-
-function _applyStraightDriftBrake(car, input, dt, sideSpeed) {
-  if (!input.handbrake || input.driftBurst || (car.driftImpulsePending || 0) > 0 || car.speed < 8) return;
-
-  const steerAmount = Math.abs(input.steer || 0);
-  const slipRatio = Math.abs(sideSpeed || 0) / Math.max(1, car.speed || 1);
-  const noTurn = 1 - clamp(steerAmount / STRAIGHT_DRIFT_STEER_MAX, 0, 1);
-  const noSlide = 1 - clamp(slipRatio / STRAIGHT_DRIFT_SLIP_MAX, 0, 1);
-  const penalty = noTurn * noSlide;
-  if (penalty <= 0.001) return;
-
-  const decel = (72 + car.speed * 0.34) * penalty * dt;
-  const k = Math.min(decel / Math.max(1, car.speed), 0.24);
-  car.vx -= car.vx * k;
-  car.vy -= car.vy * k;
-}
-
-function _updateBoost(car, input, dt) {
-  car.boostMeter = clamp(car.boostMeter || 0, 0, 100);
-  car.boostTimer = Math.max(0, (car.boostTimer || 0) - dt);
-
-  const cost = car.boostCost || 38;
-  if (input.boostJust && car.boostMeter >= cost && car.boostTimer <= 0) {
-    car.boostTimer = car.boostDuration || 1.45;
-    car._boostDrainPerSec = cost / Math.max(0.25, car.boostTimer);
-  }
-  if (car.boostTimer > 0) {
-    car.boostMeter = Math.max(0, car.boostMeter - (car._boostDrainPerSec || cost) * dt);
-    if (car.boostMeter <= 0) car.boostTimer = 0;
-  }
-  car.boosting = car.boostTimer > 0;
-  const target = car.boosting ? 1 : 0;
-  const response = car.boosting ? 5.5 : 3.2;
-  car.boostPower = (car.boostPower || 0) + (target - (car.boostPower || 0)) * (1 - Math.exp(-response * dt));
-}
-
-function _updateDrs(car, input, track, dt) {
-  car.superBoostMeter = clamp(car.superBoostMeter ?? 100, 0, 100);
-  car.drsTimer = Math.max(0, (car.drsTimer || 0) - dt);
-  car.drsTapTimer = Math.max(0, (car.drsTapTimer || 0) - dt);
-
-  const hit = _closestCenterlineSegment(car.x, car.y, track.centerLine || []);
-  let available = false;
-  if (hit && car.speed > DRS_MIN_SPEED && !car.drifting && !car.offTrack) {
-    const fwdX = Math.cos(car.angle);
-    const fwdY = Math.sin(car.angle);
-    const headingAlign = Math.abs(fwdX * hit.tx + fwdY * hit.ty);
-    available = hit.straightness > 0.965 && headingAlign > 0.82 && hit.dist < (track.width || 100) * 0.40;
-  }
-
-  if (available && input.boostJust && car.superBoostMeter > 8) {
-    if (input.boostDouble || car.drsTapTimer > 0) {
-      car.drsTimer = 2.6;
-      car.drsTapTimer = 0;
-    } else {
-      car.drsTapTimer = 0.48;
-    }
-  }
-
-  if (!available) {
-    car.drsTimer = 0;
-    car.drsTapTimer = 0;
-    car.superBoostMeter = Math.min(100, car.superBoostMeter + dt * 18);
-  }
-
-  let active = available && car.drsTimer > 0 && car.superBoostMeter > 0;
-  if (active) {
-    car.superBoostMeter = Math.max(0, car.superBoostMeter - 42 * dt);
-    if (car.superBoostMeter <= 0) {
-      car.drsTimer = 0;
-      active = false;
-    }
-  }
-  car.drsAvailable = available;
-  car.drsActive = active;
-  const target = active ? 1 : 0;
-  car.drsPower = (car.drsPower || 0) + (target - (car.drsPower || 0)) * (1 - Math.exp(-(active ? 5.0 : 5.8) * dt));
-}
-
-function _gearTop(gear, car = null) {
-  const baseTop = GEAR_TOP[8] || 355;
-  const gearTop = GEAR_TOP[gear] || GEAR_TOP[1];
-  if (!car?.maxSpeed) return gearTop * TOP_SPEED_MULT;
-  const topGearRedline = car.maxSpeed * TOP_SPEED_MULT * _topGearRedlineRatio(car);
-  return (gearTop / baseTop) * topGearRedline;
-}
-
-function _topGearRedlineRatio(car) {
-  const powerToWeight = (car.power || car.maxTorque || 520) / Math.max(650, car.mass || 1200);
-  const lowTopSpeedComp = Math.max(0, 320 - (car.maxSpeed || 320)) * 0.00135;
-  const highPowerComp = Math.max(0, powerToWeight - 0.70) * 0.11;
-  return clamp(0.56 + lowTopSpeedComp + highPowerComp, TOP_GEAR_REDLINE_MIN, TOP_GEAR_REDLINE_MAX);
 }
 
 function _closestCenterlineSegment(x, y, centerLine, hintIndex = null) {

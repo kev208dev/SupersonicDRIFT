@@ -225,7 +225,8 @@ export function updateCar3D(mesh3d, car, input, track = null) {
     const driftDrop = car.drifting ? 0.22 : 0;
     mesh3d.body.position.y = avgY - baseRef - driftDrop;
     const targetPitch = (rAvg - fAvg) * 0.02 + throttle * 0.018 - brake * 0.048;
-    const driftLean = car.drifting ? -Math.sign(car.sideSpeed || car.steerAngle || 1) * 0.045 : 0;
+    // KartRider 연출: 드리프트 시 차체 롤 ~4-5°
+    const driftLean = car.drifting ? -Math.sign(car.sideSpeed || car.steerAngle || 1) * 0.080 : 0;
     const wallRideLean = car.wallRiding ? -(car.wallRideSide || Math.sign(car.sideSpeed || 1)) * 0.075 : 0;
     const targetRoll = (rAvg2 - lAvg) * 0.02 - car.steerAngle * speed * 0.00062 + driftLean + wallRideLean;
     mesh3d.body.rotation.z += (targetPitch - mesh3d.body.rotation.z) * 0.20;
