@@ -17,6 +17,7 @@ import {
   updateFovPump,
 } from '../js/effects.js';
 import { scatterProps, updateScenery } from '../js/scenery.js';
+import { makeDriftFxState, applyDriftBodyFx, emitDriftSparks } from '../js/driftFx.js';
 import { awardMissions, recordTrackPlay } from '../utils/profile.js';
 import { CAR_DATA } from '../data/cars.js';
 import { initMiniMap, updateMiniMap, hideMiniMap } from '../js/minimap.js';
@@ -49,6 +50,7 @@ let rearViewActive = false; // '/' 누르고 있는 동안 true
 let smokePool = null;
 let skidBuf   = null;
 let sparkPool = null;
+let driftFxState = null;
 let shake     = null;
 let speedLines = null;
 let propsGroup = null;
@@ -187,7 +189,8 @@ export function initGame(cd, tr, resultsCb, menuCb, options = {}) {
   // ── effects ──
   smokePool  = createSmokePool(scene, 48);
   skidBuf    = createSkidBuffer(scene, 360);
-  sparkPool  = createSparkPool(scene, 28);
+  sparkPool  = createSparkPool(scene, 64);
+  driftFxState = makeDriftFxState();
   shake      = makeShake();
   speedLines = makeSpeedLines(36);
 
@@ -333,11 +336,13 @@ export function updateGame(dt, now) {
       triggerShake(shake, Math.min(12, car.speed * 0.04));
     }
   }
+  emitDriftSparks(driftFxState, car, sparkPool, dt);
   updateSmoke(smokePool, dt);
   updateSparks(sparkPool, dt);
 
   // ── 3D update ──
   updateCar3D(carMesh, car, driveInput, track);
+  applyDriftBodyFx(driftFxState, carMesh, car, dt);
   _updateGhostMesh(now);
   updateScenery(propsGroup, now);
   _updateCamera(dt);

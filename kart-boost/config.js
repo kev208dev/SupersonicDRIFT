@@ -8,10 +8,11 @@ export const KART_TUNING = {
   ROLL_FWD:    0.995, // 전진 구름저항 — 사실상 안 죽음
 
   // ── 속도 티어 (km/h) ───────────────────────────────────────
-  V_BOOST_MUL: 1.50,  // boost top = 1.5× cruise
-  ACCEL_BASE:  95,    // km/h/s
-  BRAKE_RATE:  150,
-  REVERSE_TOP: 60,
+  CRUISE_MUL:  1.35,  // car.maxSpeed에 곱하는 전역 cruise 배율
+  V_BOOST_MUL: 1.30,  // boost top = 1.30× cruise (부스트가 너무 폭주하지 않게)
+  ACCEL_BASE:  150,   // km/h/s — 정지→cruise ≈ 1.3s
+  BRAKE_RATE:  205,
+  REVERSE_TOP: 80,
 
   // ── 드리프트 회전 ──────────────────────────────────────────
   DRIFT_YAW:         2.6,            // rad/s (~150°/s)
@@ -26,14 +27,20 @@ export const KART_TUNING = {
   GAUGE_MAX:           100,
   GAUGE_RATE:          30,   // slip×speed 가중 충전
   BOOST_COST:          30,   // 1스택
-  BOOST_INSTANT_DV:    72,   // km/h (≈ +20 m/s) — 즉발 임펄스
-  BOOST_SUSTAIN_TIME:  1.2,  // s
-  BOOST_SUSTAIN_ACCEL: 108,  // km/h/s (≈ +30 m/s²)
+  BOOST_INSTANT_DV:    45,   // km/h — 즉발 임펄스 (벽 충돌 완화 위해 낮춤)
+  BOOST_SUSTAIN_TIME:  1.0,  // s
+  BOOST_SUSTAIN_ACCEL: 85,   // km/h/s — 지속 가속 (감속 후 천천히 cap까지)
   BOOST_CAP_DECAY:     0.6,  // s — 캡을 boost→cruise로 부드럽게
 
   // ── 조향 응답 ──────────────────────────────────────────────
-  STEER_RESPONSE_NORMAL: 5.8,
   STEER_RESPONSE_DRIFT:  11.0,
+
+  // ── 일반 주행 조향 손맛 (비드리프트 경로만 적용) ────────────
+  // 응답률 r = 3/T (T초에 95% 도달). 클수록 빠름.
+  STEER_ENGAGE:           15.0, // ≈ 0.20s에 풀조향 도달 (입력 → 휠)
+  STEER_RETURN:           20.0, // ≈ 0.15s에 0으로 복귀 (놓으면 빠르게)
+  MAX_YAW:                2.3,  // rad/s ≈ 130°/s — 최대 회전속도 cap
+  HIGHSPEED_TURN_FACTOR:  0.55, // 최고속 회전력 배율 (저속 1.0 → 최고속 0.55)
 
   // ── 드리프트 진입 최저속 ───────────────────────────────────
   MIN_DRIFT_SPEED: 28,
@@ -55,6 +62,6 @@ export const KART_CAMERA = {
 
   BODY_ROLL_DRIFT: 0.080, // rad ≈ 4.6° (차체 롤)
 
-  SPEEDLINE_KMH:   160,   // ~60 m/s 영역에서 본격 발동
-  SPEEDLINE_RANGE: 130,   // intensity 정규화 폭
+  SPEEDLINE_KMH:   200,   // cruise 위 영역에서 발동
+  SPEEDLINE_RANGE: 160,   // intensity 정규화 폭
 };

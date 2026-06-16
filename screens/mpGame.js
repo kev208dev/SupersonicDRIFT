@@ -22,6 +22,7 @@ import {
   updateFovPump,
 } from '../js/effects.js';
 import { scatterProps, updateScenery } from '../js/scenery.js';
+import { makeDriftFxState, applyDriftBodyFx, emitDriftSparks } from '../js/driftFx.js';
 import { RemoteCarInterp } from '../js/net/interp.js';
 import { getSharedRenderer } from '../js/renderer.js';
 import { checkVehicleCollisions } from '../js/competitionCollision.js';
@@ -48,6 +49,7 @@ let hudCtx = null;
 let cameraMode = 'chase';
 let rearViewActive = false;
 
+let driftFxState = null;
 let smokePool = null;
 let skidBuf = null;
 let sparkPool = null;
@@ -164,7 +166,8 @@ export function initMpGame({
 
   smokePool = createSmokePool(scene, 48);
   skidBuf = createSkidBuffer(scene, 360);
-  sparkPool = createSparkPool(scene, 28);
+  sparkPool = createSparkPool(scene, 64);
+  driftFxState = makeDriftFxState();
   shake = makeShake();
   speedLines = makeSpeedLines(36);
 
@@ -297,11 +300,13 @@ export function updateMpGame(dt, now) {
       triggerShake(shake, Math.min(12, car.speed * 0.04));
     }
   }
+  emitDriftSparks(driftFxState, car, sparkPool, dt);
   updateSmoke(smokePool, dt);
   updateSparks(sparkPool, dt);
 
   // Local mesh
   updateCar3D(carMesh, car, driveInput, track);
+  applyDriftBodyFx(driftFxState, carMesh, car, dt);
   updateScenery(propsGroup, now);
 
   // Remote ghosts

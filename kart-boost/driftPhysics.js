@@ -38,7 +38,7 @@ export function stepKartDrift(car, input, dt) {
   updateDriftStateMachine(car, input, dt);
   updateBoostState(car, input, dt);
 
-  const maxCruise = Math.max(120, (car.maxSpeed || 180));
+  const maxCruise = Math.max(120, (car.maxSpeed || 180)) * (K.CRUISE_MUL || 1);
   const maxBoost  = maxCruise * K.V_BOOST_MUL;
   const topCap    = currentTopCap(car, maxCruise, maxBoost);
   car.maxCapNow   = topCap;
@@ -56,8 +56,18 @@ export function stepKartDrift(car, input, dt) {
   const speedRatio  = clamp(Math.abs(vF) / maxCruise, 0, 1);
   const maxWheel    = (car.drifting ? 0.95 : (0.72 - speedRatio * 0.28)) * (car.turnStrength || 1);
   const targetWheel = -input.steer * maxWheel;
-  const steerResp   = car.drifting ? K.STEER_RESPONSE_DRIFT : K.STEER_RESPONSE_NORMAL;
-  car.steerAngle   += (targetWheel - car.steerAngle) * Math.min(dt * steerResp, 1);
+
+  if (car.drifting) {
+    // 드리프트 조향: 기존 응답 유지
+    const steerResp = K.STEER_RESPONSE_DRIFT;
+    car.steerAngle += (targetWheel - car.steerAngle) * Math.min(dt * steerResp, 1);
+  } else {
+    // 일반 주행: 비대칭 스무딩 (engage 느리게, return 빠르게)
+    const moving = Math.abs(targetWheel) > Math.abs(car.steerAngle);
+    const steerResp = moving ? K.STEER_ENGAGE : K.STEER_RETURN;
+    const k = 1 - Math.exp(-steerResp * dt); // framerate-independent
+    car.steerAngle += (targetWheel - car.steerAngle) * k;
+  }
 
   if (Math.abs(vF) > 0.6) {
     const dirSign = vF >= 0 ? 1 : -1;
@@ -66,8 +76,14 @@ export function stepKartDrift(car, input, dt) {
       const yawRate = -input.steer * K.DRIFT_YAW * Math.max(0.35, speedRatio) * dirSign;
       car.angle += yawRate * dt;
     } else {
-      const turnGain = (0.42 + speedRatio * 0.55) * (car.turnStrength || 1);
-      car.angle += car.steerAngle * turnGain * dirSign * dt;
+      // 일반 주행: 고속에서 회전력 감소 (1.0 → HIGHSPEED_TURN_FACTOR) + MAX_YAW로 cap
+      const baseGain = 0.95 * (car.turnStrength || 1);
+      const speedFactor = 1 - (1 - K.HIGHSPEED_TURN_FACTOR) * speedRatio;
+      let yawRate = car.steerAngle * baseGain * speedFactor * dirSign;
+      // 최대 회전속도 cap (rad/s)
+      if (yawRate >  K.MAX_YAW) yawRate =  K.MAX_YAW;
+      if (yawRate < -K.MAX_YAW) yawRate = -K.MAX_YAW;
+      car.angle += yawRate * dt;
     }
   }
 
