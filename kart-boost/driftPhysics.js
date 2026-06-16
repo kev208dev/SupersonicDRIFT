@@ -69,18 +69,24 @@ export function stepKartDrift(car, input, dt) {
     car.steerAngle += (targetWheel - car.steerAngle) * k;
   }
 
+  // 드리프트 yaw 적용 전 angle 백업 (속도 벡터를 일부 따라 회전시킬 때 사용)
+  const angleBeforeYaw = car.angle;
+
   if (Math.abs(vF) > 0.6) {
     const dirSign = vF >= 0 ? 1 : -1;
     if (car.drifting) {
-      // heading을 회전 → 속도방향과 슬립각이 벌어짐
-      const yawRate = -input.steer * K.DRIFT_YAW * Math.max(0.35, speedRatio) * dirSign;
-      car.angle += yawRate * dt;
+      // 목표 yaw rate → 보간된 적용 yaw rate (휙 안 들어가게)
+      const targetYawRate = -input.steer * K.DRIFT_YAW * Math.max(0.35, speedRatio) * dirSign;
+      car._driftYawRate = car._driftYawRate || 0;
+      const yawK = 1 - Math.exp(-(K.DRIFT_YAW_SMOOTH || 8.0) * dt);
+      car._driftYawRate += (targetYawRate - car._driftYawRate) * yawK;
+      car.angle += car._driftYawRate * dt;
     } else {
-      // 일반 주행: 고속에서 회전력 감소 (1.0 → HIGHSPEED_TURN_FACTOR) + MAX_YAW로 cap
+      car._driftYawRate = 0;
+      // 일반 주행: 고속에서 회전력 감소 + MAX_YAW로 cap
       const baseGain = 0.95 * (car.turnStrength || 1);
       const speedFactor = 1 - (1 - K.HIGHSPEED_TURN_FACTOR) * speedRatio;
       let yawRate = car.steerAngle * baseGain * speedFactor * dirSign;
-      // 최대 회전속도 cap (rad/s)
       if (yawRate >  K.MAX_YAW) yawRate =  K.MAX_YAW;
       if (yawRate < -K.MAX_YAW) yawRate = -K.MAX_YAW;
       car.angle += yawRate * dt;
@@ -103,15 +109,35 @@ export function stepKartDrift(car, input, dt) {
   }
   vF = Math.min(vF, topCap);
 
-  // ─── 마찰: 전진 거의 없음 / 횡 그립값 ───
+  // ─── 마찰: 전진 거의 없음 / 횡 그립값 (0.25s 보간) ───
   const frames = dt * 60;
   vF *= Math.pow(K.ROLL_FWD, frames);
-  const grip = car.drifting ? K.GRIP_DRIFT : K.GRIP_NORMAL;
+
+  // grip blend 0..1 (드리프트=1, 평소=0). 전환 시 0.25s lerp.
+  car._driftGripBlend = car._driftGripBlend || 0;
+  const gripTau = Math.max(0.05, K.GRIP_TRANSITION_TIME || 0.25);
+  const gripK = 1 - Math.exp(-(3.0 / gripTau) * dt);
+  car._driftGripBlend += ((car.drifting ? 1 : 0) - car._driftGripBlend) * gripK;
+  const grip = K.GRIP_NORMAL + (K.GRIP_DRIFT - K.GRIP_NORMAL) * car._driftGripBlend;
   vL *= Math.pow(grip, frames);
 
-  // 재합성
+  // 재합성 (OLD frame)
   car.vx = fwdX * vF + rgtX * vL;
   car.vy = fwdY * vF + rgtY * vL;
+
+  // ★ 드리프트 中 속도 벡터를 heading 회전 일부 따라가게 → 곡선 감싸돌기
+  //   100% 따라오면 일반 코너링이 되니까 FOLLOW 비율로 블렌드.
+  if (car.drifting && (K.DRIFT_HEADING_FOLLOW || 0) > 0) {
+    const yawDelta = car.angle - angleBeforeYaw;
+    if (yawDelta !== 0) {
+      const blendAngle = yawDelta * K.DRIFT_HEADING_FOLLOW;
+      const cb = Math.cos(blendAngle), sb = Math.sin(blendAngle);
+      const nvx = car.vx * cb - car.vy * sb;
+      const nvy = car.vx * sb + car.vy * cb;
+      car.vx = nvx; car.vy = nvy;
+    }
+  }
+
   car.speed = Math.hypot(car.vx, car.vy);
   car.forwardSpeed = vF;
   car.sideSpeed    = vL;

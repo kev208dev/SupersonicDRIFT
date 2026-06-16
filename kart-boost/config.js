@@ -3,9 +3,10 @@
 
 export const KART_TUNING = {
   // ── 그립 (횡속 유지율 / 60fps 프레임) ──────────────────────
-  GRIP_DRIFT:  0.97, // 드리프트 中 — 옆으로 길게 미끄러짐
+  GRIP_DRIFT:  0.92, // 드리프트 中 — 뒷바퀴 살짝 물려 굴러감 (0.97=완전 미끄러짐)
   GRIP_NORMAL: 0.80, // 평소 — "레일 위에 붙은" 느낌
   ROLL_FWD:    0.995, // 전진 구름저항 — 사실상 안 죽음
+  GRIP_TRANSITION_TIME: 0.25, // s — 드리프트 시작/해제 시 그립 lerp 시간
 
   // ── 속도 티어 (km/h) ───────────────────────────────────────
   CRUISE_MUL:  1.35,  // car.maxSpeed에 곱하는 전역 cruise 배율
@@ -15,9 +16,12 @@ export const KART_TUNING = {
   REVERSE_TOP: 80,
 
   // ── 드리프트 회전 ──────────────────────────────────────────
-  DRIFT_YAW:         2.6,            // rad/s (~150°/s)
-  DRIFT_ENTRY_YAW:   0.06,           // rad — 진입 임펄스
-  MAX_SLIP_ANGLE:    Math.PI * 0.22, // ~40° 넘으면 드탈
+  DRIFT_YAW:         1.8,            // rad/s (~103°/s) — 부드럽게
+  DRIFT_YAW_SMOOTH:  8.0,            // /s — 적용 yaw rate lerp (입력→실제)
+  DRIFT_ENTRY_YAW:   0.035,          // rad — 진입 임펄스 (약화)
+  DRIFT_HEADING_FOLLOW: 0.55,        // ★ heading 회전의 55%가 속도 벡터도 따라옴
+                                     //   1.0=일반 코너링, 0.0=완전 미끄러짐
+  MAX_SLIP_ANGLE:    Math.PI * 0.16, // ~29° — 슬립각 상한
   TAP_YAW_IMPULSE:   0.085,
   TAP_STEER_HI:      0.55,
   TAP_STEER_LO:      0.20,
