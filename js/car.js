@@ -90,6 +90,9 @@ export function createCar3D(carData = {}) {
   const body  = new THREE.Group();
   const inner = new THREE.Group();
   inner.rotation.y = Math.PI / 2;
+  // 회전축(=root origin)을 차체 뒤로 살짝 옮기기 — inner를 차 forward(+X) 로 밀어 GLB를 앞으로 보냄.
+  // KART_REAR_PIVOT_BIAS: 0=중심, 1=뒤끝. 살짝 → 0.30.
+  inner.position.x = (KC.KART_LENGTH || 18.7) * 0.5 * (KC.KART_REAR_PIVOT_BIAS || 0.30);
   const kart  = getKartMesh(kartId);
   const model = kart ? kart.root : _fallbackBox();
   inner.add(model);

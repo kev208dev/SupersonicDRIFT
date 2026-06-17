@@ -146,6 +146,9 @@ export const KART_CAMERA = {
   // ── 드리프트 차체 롤 + 카메라 뱅크 ──
   // 카트 = 안쪽으로 확 누움. 카메라 = 같은 방향으로 살짝 뱅크.
   // 정상 lerp는 부드럽게, cut/align/spin 종료는 빠르게 0 복귀.
+  // 회전 피벗 (root)을 차체 뒤쪽으로 옮기기 — drift/yaw 회전 中심이 뒷축에 가까워짐.
+  KART_LENGTH:           18.7,             // GLB normalize TARGET_MAX와 동일
+  KART_REAR_PIVOT_BIAS:  0.30,             // 0=중심, 1=뒤끝 (살짝)
   KART_ROLL_MAX:   22 * Math.PI / 180,  // 22° — 카트라이더식 안쪽 누움
   CAM_TILT_MAX:    7  * Math.PI / 180,  // 7° — 수평선 확실히 기울게
   ROLL_LERP:       7.0,                 // /s — 정상 응답
