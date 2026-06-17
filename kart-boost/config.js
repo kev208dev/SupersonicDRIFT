@@ -15,9 +15,10 @@
 export const KART_TUNING = {
   // ── 그립 (횡속 유지율 / 60fps 프레임) ──────────────────────
   // drift 전환 = 즉시 (수식 드롭). μ는 normal→drift = 약 30% 수준으로 표현.
-  GRIP_DRIFT:  0.95, // 드리프트 中 — 횡속 거의 유지 (~95%/프레임 = 5%/프레임 손실)
-  GRIP_NORMAL: 0.78, // 평소 — 빠른 횡속 감쇠 (22%/프레임 손실 → 빠른 그립)
-  ROLL_FWD:    0.995, // 전진 구름저항
+  GRIP_DRIFT:       0.985, // 드리프트 中 — 횡속 거의 유지 (β 키우려 0.95→0.985)
+  DRIFT_SIDE_GRIP:  0.985, // alias — HOLD 中 횡속 retention (GRIP_DRIFT와 분리 튜닝 가능)
+  GRIP_NORMAL:      0.78,  // 평소 — 빠른 횡속 감쇠 (22%/프레임 손실 → 빠른 그립)
+  ROLL_FWD:         0.995, // 전진 구름저항
 
   // ── 속도 티어 (km/h) ───────────────────────────────────────
   CRUISE_MUL:  1.35,
@@ -27,11 +28,16 @@ export const KART_TUNING = {
   REVERSE_TOP: 80,
 
   // ── 드리프트 회전 ──────────────────────────────────────────
-  DRIFT_YAW:         2.4,            // rad/s — 헤딩 회전속도
+  DRIFT_YAW:         3.6,            // rad/s — 헤딩 회전속도 (β 키우려 2.4→3.6)
   DRIFT_YAW_SMOOTH:  9.0,            // /s — yaw rate lerp 응답 (스텝 응답)
-  DRIFT_ENTRY_YAW:   0.060,          // rad — 진입 임펄스 (β 즉시 키움)
-  DRIFT_HEADING_FOLLOW: 0.38,        // heading 회전의 일부만 velocity 따라옴
+  DRIFT_ENTRY_YAW:   0.48,           // rad ~28° — 진입 임펄스 (β 즉시 키움; 0.060→0.48)
+  DRIFT_HEADING_FOLLOW: 0.16,        // heading→velocity 추종 (β 키우려 0.38→0.16)
   MAX_SLIP_ANGLE:    Math.PI * 0.48, // ~86° — driftAngle 비주얼 클램프
+  // ── 슬립각 목표·캡 ──
+  TARGET_SLIP:       45 * Math.PI / 180, // 45° — HOLD 中 목표 β. 도달 시 yaw 권한 감쇠.
+  DEEP_ANGLE:        60 * Math.PI / 180, // 60° — 이 이상부터 감속 페널티 (54→60).
+  SAFE_SLIP_CAP:     80 * Math.PI / 180, // 80° — 소프트 슬립 캡 (70→80).
+  DRIFT_YAW_MUL:     1.0,                // HOLD 中 yaw 권한 전체 배수.
 
   // ── 드리프트 판정 (β 임계값) ───────────────────────────────
   DRIFT_MIN_HOLD:     0.15,          // s — 진입 직후 그레이스 (즉시 release 방지)
@@ -136,9 +142,9 @@ export const KART_CAMERA = {
   // ── 드리프트 카메라 (yaw 오프셋 — 기존 유지) ──
   CAM_DIST_PULL:   0.17,
   CAM_HEIGHT_DROP: 5,
-  DRIFT_YAW_GAIN:  0.55,
-  DRIFT_YAW_MAX:   0.26,
-  DRIFT_YAW_SMOOTH: 8.0,
+  DRIFT_YAW_GAIN:  0.80,   // 0.55→0.80 — 차체 슬립 더 따라가 측면 보이게
+  DRIFT_YAW_MAX:   0.45,   // 0.26→0.45 rad (~26°) — 카메라 yaw 지연 폭 확대
+  DRIFT_YAW_SMOOTH: 6.0,   // 8→6 — 살짝 느슨하게 추적
   BODY_ROLL_DRIFT: 0.080,    // (legacy, 사용 안 함 — KART_ROLL_MAX로 교체)
   SPEEDLINE_KMH:   200,
   SPEEDLINE_RANGE: 160,

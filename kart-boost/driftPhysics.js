@@ -125,7 +125,13 @@ export function stepKartDrift(car, input, dt, track) {
   if (Math.abs(vF) > 0.6) {
     const dirSign = vF >= 0 ? 1 : -1;
     if (car.drifting) {
-      const targetYawRate = -input.steer * K.DRIFT_YAW * Math.max(0.35, speedRatio) * dirSign;
+      // β를 TARGET_SLIP으로 수렴: |β| < TARGET 이면 full yaw 권한, 도달하면 0, 초과하면 약하게 되돌림.
+      const slipNorm = Math.abs(beta) / Math.max(1e-3, K.TARGET_SLIP);
+      const driftGate = slipNorm < 1
+        ? (1 - slipNorm * slipNorm)        // 0~TARGET: 1 → 0 (smooth)
+        : -0.35 * Math.min(1, slipNorm - 1); // 초과: 음의 yaw로 되돌림
+      const mulHold   = (K.DRIFT_YAW_MUL || 1.0);
+      const targetYawRate = -input.steer * K.DRIFT_YAW * Math.max(0.35, speedRatio) * dirSign * driftGate * mulHold;
       car._driftYawRate = car._driftYawRate || 0;
       car._driftYawRate += (targetYawRate - car._driftYawRate) * (1 - Math.exp(-K.DRIFT_YAW_SMOOTH * dt));
       car.angle += car._driftYawRate * dt;
