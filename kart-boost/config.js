@@ -56,6 +56,15 @@ export const KART_TUNING = {
   COUNTER_STEER_THRESHOLD: 0.3,      // 반대 부호 |steer| 이상이면 카운터 인정
   ALIGNMENT_GAIN:    3.5,            // /s — heading→velocity 정렬 속도
 
+  // ── 드리프트 회복 (CM 활주 + 차체 1회 회전, yaw·속도 디커플) ──
+  // 종료 시 velocity 스냅 ❌. 관성 그대로 두고 heading만 진행방향으로 회전.
+  // 횡속은 RECOVER_GRIP로 천천히 블리드 → 잠깐 미끄러지는 '활주' 구간.
+  // heading 회전은 1회 수렴(임계감쇠), 도달 후 정지 → fishtail 방지.
+  RECOVER_DURATION:   0.45,           // s — 회복 윈도우 (활주 + 회전 진행)
+  RECOVER_YAW_RATE:   5.5,            // rad/s (~315°/s) — heading→velocity 1회 회전
+  RECOVER_GRIP:       0.92,           // 횡속 retention (NORMAL 0.78보다 느슨 — 활주감)
+  RECOVER_OVERSHOOT:  0,              // rad — 0=칼정렬, >0=한 번만 살짝 넘침
+
   // ── 게이지 & 부스트 스택 ──────────────────────────────────
   // ΔG = speed × sin(β) × W_track × dt
   // 100 → 스택+1, 게이지 0. 스택 만석(2) 시 충전 멈춤.

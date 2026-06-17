@@ -61,6 +61,16 @@ function endDriftRoutine(car, reason) {
   car.driftStateTime = 0;
   car.drifting = false;
   car._lastDriftEndReason = reason;
+  // 회복 페이즈: CM 관성 보존 + heading 1회 회전. spin 종료는 회복 skip(이미 속도 손실).
+  if (reason === 'spin') {
+    car._recoverActive = false;
+    car._recoverTimer  = 0;
+    car._recoverDone   = true;
+  } else {
+    car._recoverActive = true;
+    car._recoverTimer  = K.RECOVER_DURATION;
+    car._recoverDone   = false;
+  }
 }
 
 // ─── 메인 스텝 ────────────────────────────────────────────
@@ -143,6 +153,21 @@ export function stepKartDrift(car, input, dt, track) {
     }
   }
 
+  // ─── 회복 페이즈: 차체 yaw → velocity 방향으로 1회 회전 (CM 관성 보존) ───
+  // 도달 시점에 회전 정지 → 반복 진동(팽이) 차단. 횡속 블리드는 RECOVER_GRIP에서.
+  if (car._recoverActive && !car._recoverDone && Math.hypot(car.vx, car.vy) > 1) {
+    const velAngle = Math.atan2(car.vy, car.vx);
+    const delta    = wrapAngle(velAngle - car.angle);
+    const maxStep  = K.RECOVER_YAW_RATE * dt;
+    if (Math.abs(delta) <= maxStep) {
+      // 도달: optional overshoot 후 종결.
+      car.angle += delta + Math.sign(delta) * (K.RECOVER_OVERSHOOT || 0);
+      car._recoverDone = true;
+    } else {
+      car.angle += Math.sign(delta) * maxStep;
+    }
+  }
+
   // ─── 가속/제동 (전진축) ───
   if (input.throttle > 0) {
     vF += K.ACCEL_BASE * (car.accelerationForce || 1) * input.throttle * dt;
@@ -182,8 +207,10 @@ export function stepKartDrift(car, input, dt, track) {
   const frames = dt * 60;
   vF *= Math.pow(K.ROLL_FWD, frames);
 
-  // μ 단절: drift 진입/해제 즉시 (discontinuous).
-  const baseGrip = car.drifting ? K.GRIP_DRIFT : K.GRIP_NORMAL;
+  // μ 단절: drift 中 = GRIP_DRIFT, 회복 中 = RECOVER_GRIP(느슨, 활주), 평소 = GRIP_NORMAL.
+  const baseGrip = car.drifting
+    ? K.GRIP_DRIFT
+    : (car._recoverActive ? K.RECOVER_GRIP : K.GRIP_NORMAL);
   const sideRetention = isIce ? K.ICE_SIDE_RETENTION : baseGrip;
   vL *= Math.pow(sideRetention, frames);
 
@@ -248,6 +275,12 @@ export function stepKartDrift(car, input, dt, track) {
   car.driftTime    = car.drifting ? (car.driftStateTime || 0) : 0;
   car.suppressSkid = isIce && K.ICE_DISABLE_SKID;
   car._counterSteer = counterSteer;
+
+  // 회복 타이머 — 만료되면 RECOVER_GRIP 해제 → 평소 GRIP_NORMAL 복귀.
+  if (car._recoverActive) {
+    car._recoverTimer -= dt;
+    if (car._recoverTimer <= 0) car._recoverActive = false;
+  }
 }
 
 function currentTopCap(car, maxCruise, maxBoost) {
@@ -277,6 +310,9 @@ export function updateDriftStateMachine(car, input, dt) {
       car.driftStateTime = 0;
       car.drifting       = true;
       car._driftDir      = steerSign;
+      // 회복 中 새 드리프트 — 회복 페이즈 즉시 종료.
+      car._recoverActive = false;
+      car._recoverDone   = true;
       // 진입 임펄스 — 마찰 정점 돌파 표현 (β 즉시 키움)
       car.angle += steerSign * -K.DRIFT_ENTRY_YAW;
     } else {
@@ -361,6 +397,9 @@ export function initKartState(car) {
   car._driftDir          = 0;
   car._counterSteer      = false;
   car._lastDriftEndReason = null;
+  car._recoverActive     = false;
+  car._recoverTimer      = 0;
+  car._recoverDone       = true;
   car.driftTime          = 0;
   car.surface            = 'asphalt';
   car.iceSurface         = false;
