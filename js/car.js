@@ -87,8 +87,12 @@ export function createCar3D(carData = {}) {
   const model = glb || createCarDesign(designType);
   if (!glb) _applySkin(model, carData.skin);
   model.rotation.y = Math.PI / 2;
-  // GLB는 normalize 단계에서 단위 박스로 맞춰져 있어 같은 scale 5.2 적용.
-  model.scale.set(5.2, 5.2, 5.2);
+  if (glb) {
+    // GLB는 normalize가 이미 TARGET 단위로 맞춰놨음 → 덮어쓰지 말고 곱하기.
+    model.scale.multiplyScalar(5.2);
+  } else {
+    model.scale.set(5.2, 5.2, 5.2);
+  }
   root.add(model);
 
   const wheelGroups = [];
