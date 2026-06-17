@@ -22,8 +22,14 @@ function _loadOne(id) {
     loader.load(KART_URLS[id], gltf => {
       _loaded[id] = gltf.scene;
       _normalize(_loaded[id]);
+      let meshCount = 0;
+      _loaded[id].traverse(c => { if (c.isMesh) meshCount++; });
+      console.log(`[kart] loaded ${id}: ${meshCount} mesh(es)`);
       resolve(_loaded[id]);
-    }, undefined, reject);
+    }, undefined, err => {
+      console.warn(`[kart] FAILED ${id}:`, err);
+      reject(err);
+    });
   });
   return _loading[id];
 }
@@ -67,7 +73,7 @@ function _normalize(scene) {
   });
 }
 
-// 휠 감지: 이름 매치(wheel|tire|tyre|rim) 우선, 못 찾으면 bottom-4 휴리스틱.
+// 휠 감지: 이름 매치(wheel|tire|tyre|rim)만. 매치 부족 시 휠 회전 ❌ (차체 통회전 방지).
 // 반환: [{ pivot: Group, axis: 'x'|'y'|'z', front: bool, side: -1|1 }]
 function _detectWheels(root) {
   const named = [];
@@ -78,29 +84,12 @@ function _detectWheels(root) {
       named.push(c);
     }
   });
-  let picks = named;
-  if (picks.length < 4) {
-    // 이름 매치 부족 → bottom-4 휴리스틱.
-    const meshes = [];
-    root.traverse(c => { if (c.isMesh) meshes.push(c); });
-    const withY = meshes.map(m => {
-      const b = new THREE.Box3().setFromObject(m);
-      return { mesh: m, y: (b.min.y + b.max.y) * 0.5, center: b.getCenter(new THREE.Vector3()), size: b.getSize(new THREE.Vector3()) };
-    });
-    withY.sort((a, b) => a.y - b.y);
-    picks = withY.slice(0, 8).map(o => o.mesh);
-    // 그중 4개: front-left/right + rear-left/right (x, z 좌표 극값).
-    if (picks.length > 4) {
-      const scored = picks.map(m => {
-        const c = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3());
-        return { mesh: m, x: c.x, z: c.z };
-      });
-      // 절댓값 큰 순.
-      scored.sort((a, b) => (Math.abs(b.x) + Math.abs(b.z)) - (Math.abs(a.x) + Math.abs(a.z)));
-      picks = scored.slice(0, 4).map(s => s.mesh);
-    }
+  // 이름 매치 < 2 이면 휴리스틱 사용 ❌ — 단일 메시 GLB가 통째로 돌아가는 버그 방지.
+  if (named.length < 2) {
+    console.log(`[kart] wheel detect: only ${named.length} named match → skip spin`);
+    return [];
   }
-  if (picks.length === 0) return [];
+  const picks = named;
 
   // 각 휠을 pivot Group으로 감싸기: pivot이 휠 중심에 위치 → mesh는 pivot-local 0,0,0.
   const wheels = [];

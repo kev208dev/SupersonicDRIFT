@@ -85,23 +85,36 @@ export function createCar3D(carData = {}) {
   const validIds  = listKartIds();
   const kartId    = validIds.includes(designId) ? designId : validIds[0];
 
-  // GLB 우선. 로드 전이면 simple fallback box로 보여서 첫 프레임 살림.
+  // GLB 우선. 로드 전이면 fallback box → updateCar3D에서 GLB 준비되는 즉시 swap.
   const kart = getKartMesh(kartId);
   const model = kart ? kart.root : _fallbackBox();
   model.rotation.y = Math.PI / 2;
-  // GLB는 normalize가 이미 단위 박스로 맞춤. fallback box도 단위.
   model.scale.multiplyScalar(5.2);
   root.add(model);
 
-  // 휠 — GLB가 감지한 휠 메시들. fallback box면 빈 배열.
-  const glbWheels = kart ? kart.wheels : [];
-  root.wheelGroups = glbWheels;     // {pivot, axis, front, side}
+  root.wheelGroups = kart ? kart.wheels : [];
   root.body        = model;
   root.castShadow  = true;
   root._lastWheelTime = performance.now();
-  root._designId   = kartId;
+  root._designId    = kartId;
+  root._needsGlbSwap = !kart;
 
   return root;
+}
+
+function _trySwapToGlb(root) {
+  if (!root._needsGlbSwap) return;
+  const kart = getKartMesh(root._designId);
+  if (!kart) return;
+  if (root.body) root.remove(root.body);
+  const model = kart.root;
+  model.rotation.y = Math.PI / 2;
+  model.scale.multiplyScalar(5.2);
+  root.add(model);
+  root.body = model;
+  root.wheelGroups = kart.wheels;
+  root._needsGlbSwap = false;
+  root._susState = null;  // 휠 baseY 다시 계산
 }
 
 function _fallbackBox() {
@@ -150,6 +163,8 @@ function _applySkin(model, skinData) {
 
 // ── per-frame mesh sync ──────────────────────────────────────
 export function updateCar3D(mesh3d, car, input, track = null, dt = 1 / 60) {
+  // GLB 늦게 로드된 경우 첫 프레임에 fallback → GLB 교체.
+  if (mesh3d._needsGlbSwap) _trySwapToGlb(mesh3d);
   // 2D y → 3D -z mapping
   const wallRideLift = car.wallRiding ? Math.min(2.2, 0.35 + (car.speed || 0) * 0.006) : 0;
   const surfaceY = _trackSurfaceHeight(track, car.x, car.y) + wallRideLift;
