@@ -158,7 +158,7 @@ export const KART_CAMERA = {
   // 회전 피벗 (root)을 차체 뒤쪽으로 옮기기 — drift/yaw 회전 中심이 뒷축에 가까워짐.
   KART_LENGTH:           18.7,             // GLB normalize TARGET_MAX와 동일
   KART_REAR_PIVOT_BIAS:  0.30,             // 0=중심, 1=뒤끝 (살짝)
-  KART_ROLL_MAX:   17 * Math.PI / 180,  // 17° — 차 '모델'만 기움
+  KART_ROLL_MAX:   9 * Math.PI / 180,   // 9° — 살짝만 기움
   CAM_TILT_MAX:    0,                    // PC: 카메라 뱅크 ❌. 수평선 항상 수평.
   ROLL_LERP:       7.0,                 // /s — 정상 응답
   ROLL_SNAP:       22.0,                // /s — cut/spin 시 빠른 0 복귀
