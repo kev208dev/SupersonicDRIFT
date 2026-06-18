@@ -127,11 +127,11 @@ export const KART_TUNING = {
 // KartRider식: 낮고 가깝게 + 속도 비례 FOV. 드리프트 거동은 별도(현 상태 유지).
 export const KART_CAMERA = {
   // ── chase 리그 (낮은 시점 + 짧은 거리) ──
-  CAM_HEIGHT:        13,    // 17→13 (바로 뒤·낮게)
-  CAM_DIST:          30,    // 46→30 (~35% 단축, 차체 크게)
-  CAM_LOOK_AHEAD:    50,    // 64→50 (가까운 시점에 맞춰 살짝 가까이)
-  CAM_LOOK_Y:        9,     // 11→9 (낮은 시점에 맞춰)
-  CAM_DIST_SPEED_ADD: 10,   // 14→10 (고속에서도 너무 멀어지지 않게)
+  CAM_HEIGHT:        22,    // 13→22 (+70% — 위에서 내려다보는 카트라이더식)
+  CAM_DIST:          30,    // 유지 (가까움)
+  CAM_LOOK_AHEAD:    55,    // 50→55 (앞 도로 더 보임)
+  CAM_LOOK_Y:        2,     // 9→2 (타겟 낮춤 → 카메라 약 -14° 피치)
+  CAM_DIST_SPEED_ADD: 10,
 
   // ── FOV 속도 비례 ──
   FOV_BASE:        72,
