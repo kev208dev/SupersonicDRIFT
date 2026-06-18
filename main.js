@@ -268,13 +268,13 @@ function selectAdjacentLobbyCar(direction) {
   selectLobbyCar(next.id);
 }
 
-function _openAuth() {
+function _openAuth(mode = 'login') {
   showScreen('login');
-  _resetAuthForm();
+  _resetAuthForm(mode);
 }
 
 function goToAuth() {
-  _openAuth();
+  _openAuth('login');
 }
 
 function ensureDefaultLoadout() {
@@ -549,7 +549,10 @@ function _wireMainMenu() {
     goToTrackSelect();
   });
   document.getElementById('btn-main-login')?.addEventListener('click', () => {
-    _openAuth();
+    _openAuth('login');
+  });
+  document.getElementById('btn-main-signup')?.addEventListener('click', () => {
+    _openAuth('signup');
   });
   const openHelp = (event) => {
     event?.preventDefault?.();
@@ -865,7 +868,7 @@ function _authErrorMessage(error) {
   }
 }
 
-function _resetAuthForm() {
+function _resetAuthForm(mode = 'login') {
   const idInput = document.getElementById('auth-id');
   const pwInput = document.getElementById('auth-password');
   const pwConfirm = document.getElementById('auth-password-confirm');
@@ -874,7 +877,7 @@ function _resetAuthForm() {
   if (pwInput) pwInput.value = '';
   if (pwConfirm) pwConfirm.value = '';
   if (errorEl) errorEl.textContent = '';
-  _setAuthMode('login');
+  _setAuthMode(mode);
   setTimeout(() => idInput?.focus(), 50);
 }
 
