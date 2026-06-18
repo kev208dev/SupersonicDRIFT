@@ -33,7 +33,7 @@ export const DRIFT_FX_CONFIG = {
   // ── 연기 방출 (rate는 β/속도 비례) ──
   SMOKE_REAR_OFFSET:    -7.6,   // 차 로컬 X (뒤)
   SMOKE_SIDE_OFFSET:    7.2,    // 차 로컬 Z (양옆)
-  SMOKE_Y:              1.0,
+  SMOKE_Y:              0.25,   // 1.0→0.25 — 뒷바퀴 접지점 가까이
   SMOKE_RATE_BASE:      22,     // /s — 진입 시
   SMOKE_RATE_PEAK:      65,     // /s — 깊은 β + 고속 (렉 줄이려 cap 낮춤)
   SMOKE_BETA_REF:       Math.PI * 0.35, // 이 β에서 peak 도달
@@ -203,15 +203,9 @@ function _emitSmokeBurst(car, smokePool) {
     const vy = DRIFT_SMOKE_TUNING.SMOKE_UP_SPEED * (0.6 + Math.random() * 0.6);
     const vz = backZ + outZ + (Math.random() - 0.5) * 2;
 
-    // FX_DRIFT_TRAIL: gauge에 따라 색 보간 (저→흰/노랑, 고→파랑/보라).
-    let opts;
-    if (KC.FX_DRIFT_TRAIL !== false) {
-      const g = Math.max(0, Math.min(1, (car.boostMeter || 0) / 100));
-      const color = _lerpColor(KC.TRAIL_COLOR_LOW || 0xfff099, KC.TRAIL_COLOR_HIGH || 0x6688ff, g);
-      opts = { color };
-    }
+    // 카트라이더식: 드리프트 연기는 무조건 흰~연회색. gauge 색 보간 ❌.
     for (let i = 0; i < DRIFT_FX_CONFIG.SMOKE_PER_BURST; i++) {
-      spawnDriftSmoke3D(smokePool, wx, w3y, w3z, vx, vy, vz, opts);
+      spawnDriftSmoke3D(smokePool, wx, w3y, w3z, vx, vy, vz);
     }
   }
 }

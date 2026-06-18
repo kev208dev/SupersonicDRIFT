@@ -115,21 +115,24 @@ export function createCar3D(carData = {}) {
 }
 
 function _addBrakeLight(parent) {
+  // 차 후미 범퍼 위치에 작게 부착 — 허공에 안 뜨게 GLB 안쪽으로 당김.
   const len = KC.KART_LENGTH || 18.7;
   const bias = KC.KART_REAR_PIVOT_BIAS || 0.30;
-  const rearX = -(len * 0.5) + (len * 0.5 * bias);
-  // 두 개 후미등(좌/우) — 명도로 ON/OFF.
+  // root-local rear face ≈ -(len/2 - len*0.5*bias). 거기서 살짝 안쪽으로(+0.3).
+  const rearX = -(len * 0.5) + (len * 0.5 * bias) + 0.3;
   for (const side of [-1, 1]) {
     const m = new THREE.Mesh(
-      new THREE.BoxGeometry(0.6, 0.5, 1.8),
+      new THREE.BoxGeometry(0.3, 0.25, 0.9),
       new THREE.MeshStandardMaterial({
-        color: 0x441111,
-        emissive: 0x441111,
-        emissiveIntensity: 0.4,
+        color: 0x220000,
+        emissive: 0x110000,
+        emissiveIntensity: 0.0,
+        transparent: true,
+        opacity: 0.0,
       })
     );
     m.name = 'brakelight';
-    m.position.set(rearX - 0.4, 1.8, side * 2.6);
+    m.position.set(rearX, 0.9, side * 2.0);   // 낮은 위치, 차폭 안쪽
     parent.add(m);
   }
 }
@@ -329,8 +332,11 @@ export function updateCar3D(mesh3d, car, input, track = null, dt = 1 / 60) {
   mesh3d.traverse(c => {
     if (c.name === 'brakelight' && c.material) {
       const on = braking && (KC.FX_BRAKE !== false);
-      c.material.emissive.setHex(on ? 0xff2222 : 0x441111);
-      c.material.emissiveIntensity = on ? (KC.BRAKE_GLOW_INTENSITY || 1.0) * 2.4 : 0.4;
+      // ON: 빨강 발광 + 보임. OFF: 완전 투명(거의 안 보임).
+      c.material.color.setHex(on ? 0xff2020 : 0x220000);
+      c.material.emissive.setHex(on ? 0xff2020 : 0x000000);
+      c.material.emissiveIntensity = on ? (KC.BRAKE_GLOW_INTENSITY || 1.0) * 1.6 : 0;
+      c.material.opacity = on ? 0.95 : 0.0;
     }
     if (c.name === 'boostflame') {
       const on = !!car.boosting || !!car.drsActive;

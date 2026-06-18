@@ -370,11 +370,11 @@ export function spawnDriftSmoke(position, pool = null) {
 export const DRIFT_SMOKE_TUNING = {
   SMOKE_RATE:       55,    // /s — base rate (β/속도로 가산)
   SMOKE_RATE_MAX:   120,   // /s — β=깊고 속도 cruise+ 시
-  SMOKE_LIFE:       0.85,  // s
-  SMOKE_LIFE_JIT:   0.25,  // ± random
-  SMOKE_SIZE_START: 4.5,
-  SMOKE_SIZE_END:   17.0,
-  SMOKE_OPACITY:    0.62,
+  SMOKE_LIFE:       0.55,  // 0.85→0.55 — 짧게(덩어리 ❌)
+  SMOKE_LIFE_JIT:   0.18,
+  SMOKE_SIZE_START: 2.0,   // 4.5→2.0 — 작게 시작
+  SMOKE_SIZE_END:   11.0,  // 17.0→11.0 — 부드럽게 커지며 페이드아웃
+  SMOKE_OPACITY:    0.48,  // 0.62→0.48
   SMOKE_COLOR:      0xf2f4f6, // 흰~연회색
   SMOKE_OUT_SPEED:  16,    // 바깥 방향 속도 (단위/s)
   SMOKE_UP_SPEED:   8,     // 위로 (천천히)
