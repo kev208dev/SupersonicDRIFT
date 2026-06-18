@@ -2,7 +2,7 @@
 // We sample server snapshots frequently and render slightly behind "now" so
 // remote cars stay smooth without looking delayed.
 
-const RENDER_DELAY_MS = 90;
+const RENDER_DELAY_MS = 110;   // 20Hz→30Hz 도 jitter 흡수 위해 살짝 ↑
 const MAX_EXTRAPOLATION_MS = 180;
 const BUFFER_MAX = 16;
 

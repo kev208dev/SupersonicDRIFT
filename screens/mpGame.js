@@ -528,14 +528,17 @@ function _updateRemoteCars(now) {
 
 function _checkMultiplayerVehicleCollisions() {
   if (!raceReleased || myFinished || !car || remotePlayers.size === 0) return;
-  const opponents = [...remotePlayers.values()]
-    .filter(ghost => !ghost.finished)
-    .map(ghost => ({
-      ...ghost.syntheticCar,
-      collisionRadius: 16,
-    }));
+  // 실제 syntheticCar 참조를 그대로 넘김 — spread 복사하면 임펄스가 사본에만 적용됨.
+  const opponents = [];
+  for (const ghost of remotePlayers.values()) {
+    if (ghost.finished) continue;
+    const synth = ghost.syntheticCar;
+    if (!synth) continue;
+    synth.collisionRadius = 28;   // 차 OBB(반장 11 × 2)에 가깝게 — 너무 작으면 안 부딪힘
+    opponents.push(synth);
+  }
   const hit = checkVehicleCollisions(car, opponents, 'friendly');
-  if (hit) triggerShake(shake, 3.5);
+  if (hit) triggerShake(shake, 4.5);
 }
 
 function _makeNameSprite(name, color) {
