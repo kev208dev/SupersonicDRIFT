@@ -71,6 +71,41 @@ function _normalize(scene) {
       c.receiveShadow = false;
     }
   });
+  _paintKartParts(scene);
+}
+
+// GLB 노드 이름 매치 → 차체/바퀴 머티리얼 일괄 교체.
+// body / car → 카트라이더식 빨간 광택.  wheel / tire → 매트 다크그레이.
+function _paintKartParts(scene) {
+  scene.traverse(child => {
+    if (!child.isMesh) return;
+    const name = (child.name || '').toLowerCase();
+    if (name.includes('wheel') || name.includes('tire') || name.includes('tyre') || name.includes('rim')) {
+      child.material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#1A1A1A'),
+        metalness: 0.0,
+        roughness: 0.9,
+      });
+      return;
+    }
+    if (name.includes('body') || name.includes('car') || name.includes('chassis') || name.includes('shell') || name.includes('frame')) {
+      child.material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#FF2A2A'),
+        metalness: 0.1,
+        roughness: 0.18,
+      });
+      return;
+    }
+    // 이름 매치 없음 + 단일 메시 GLB → 기본을 차체로 간주해 빨강 칠.
+    if ((child.material?.color)) {
+      const m = new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#FF2A2A'),
+        metalness: 0.1,
+        roughness: 0.22,
+      });
+      child.material = m;
+    }
+  });
 }
 
 // 휠 감지: 이름 매치(wheel|tire|tyre|rim)만. 매치 부족 시 휠 회전 ❌ (차체 통회전 방지).
