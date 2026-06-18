@@ -292,9 +292,8 @@ export function updateCar3D(mesh3d, car, input, track = null, dt = 1 / 60) {
 
   if (mesh3d.body) {
     const avgY = (fAvg + rAvg) / 2;
-    const driftDrop = car.drifting ? 0.22 : 0;
-    // GLB 바디는 normalize에서 바닥=0 정렬됨. y<0 가면 바퀴가 노면 속으로 들어감 → 클램프.
-    mesh3d.body.position.y = Math.max(0, avgY - baseRef - driftDrop);
+    // 드리프트 차체 drop ❌ (바퀴 떼지는 느낌 제거). 바닥 y=0 클램프 유지.
+    mesh3d.body.position.y = Math.max(0, avgY - baseRef);
     const targetPitch = (rAvg - fAvg) * 0.02 + throttle * 0.018 - brake * 0.048;
     // KartRider 연출: 드리프트 = 안쪽으로 확 누움.
     // intensity = β / REF_SLIP, REF_SLIP 낮춰서 중간 각도에서도 풀강도.

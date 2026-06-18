@@ -32,7 +32,7 @@ export const DRIFT_FX_CONFIG = {
   // ── 차체 squash ──
   BOOST_STRETCH_Z:   0.18,   // 부스트 펄스 정점에서 +18% 길어짐 (앞뒤)
   BOOST_SQUASH_Y:    0.08,   // 동시에 -8% 눌림 (위아래)
-  DRIFT_LEAN_BONUS:  0.045,  // 드리프트 중 추가 롤 (rad, car.js 기존 0.080 + 이 값)
+  DRIFT_LEAN_BONUS:  0,      // 드리프트 추가 롤 ❌ — yaw만 변경
   BODY_FX_RESPONSE:  10.0,   // 페이드 응답 (높을수록 빠릿)
 
   // ── 스파크 (게이지 tier로 색 변화) ──
