@@ -291,39 +291,11 @@ export function updateCar3D(mesh3d, car, input, track = null, dt = 1 / 60) {
   const rAvg2 = (sus.wheels.fr.y + sus.wheels.rr.y) / 2;
 
   if (mesh3d.body) {
-    const avgY = (fAvg + rAvg) / 2;
-    // 드리프트 차체 drop ❌ (바퀴 떼지는 느낌 제거). 바닥 y=0 클램프 유지.
-    mesh3d.body.position.y = Math.max(0, avgY - baseRef);
-    const targetPitch = (rAvg - fAvg) * 0.02 + throttle * 0.018 - brake * 0.048;
-    // KartRider 연출: 드리프트 = 안쪽으로 확 누움.
-    // intensity = β / REF_SLIP, REF_SLIP 낮춰서 중간 각도에서도 풀강도.
-    // 모델 sign: 기존 검증된 sign(sideSpeed) 방향과 일치하도록 -dir 적용.
-    const refSlip = KC.REF_SLIP || (25 * Math.PI / 180);
-    const intensity = car.drifting
-      ? Math.min(1, Math.abs(car.slipBeta || car.driftAngle || 0) / Math.max(1e-3, refSlip))
-      : 0;
-    const dir = car._driftDir || Math.sign(car.sideSpeed || car.steerAngle || 1);
-
-    // 종료가 cut/align/spin이면 빠르게 0으로 스냅. 그 외 정상 lerp.
-    const isSnapEnd = !car.drifting
-      && (car._lastDriftEndReason === 'align'
-       || car._lastDriftEndReason === 'spin'
-       || car._lastDriftEndReason === 'cut')
-      && (car.driftStateTime || 0) < 0.25;
-    const rate = isSnapEnd ? KC.ROLL_SNAP : KC.ROLL_LERP;
-    car._kartRoll = car._kartRoll ?? 0;
-    const rollTarget = car.drifting ? (-dir * KC.KART_ROLL_MAX * intensity) : 0;
-    car._kartRoll += (rollTarget - car._kartRoll) * (1 - Math.exp(-rate * Math.max(0, dt)));
-
-    // 일반 코너링 미세 롤 — drift 아닐 때 |steerAngle| 비례
-    const steerRoll = !car.drifting
-      ? (-Math.sign(car.steerAngle || 0)) * (KC.STEER_ROLL_MAX || 0)
-        * Math.min(1, Math.abs(car.steerAngle || 0) * 1.6)
-      : 0;
-
-    const driftLean    = car._kartRoll;
-    // 벽 충돌로 차가 기울지 않게 — wallRideLean ❌.
-    const targetRoll = (rAvg2 - lAvg) * 0.02 + driftLean + steerRoll;
+    // 차는 항상 평평 + 평면 — 펜스/연석/충돌이 Y/피치/롤에 영향 ❌.
+    mesh3d.body.position.y = 0;
+    const targetPitch = 0;
+    car._kartRoll = 0;
+    const targetRoll = 0;
     mesh3d.body.rotation.z += (targetPitch - mesh3d.body.rotation.z) * 0.20;
     mesh3d.body.rotation.x += (targetRoll - mesh3d.body.rotation.x) * 0.20;
   }
