@@ -15,10 +15,10 @@
 export const KART_TUNING = {
   // ── 그립 (횡속 유지율 / 60fps 프레임) ──────────────────────
   // drift 전환 = 즉시 (수식 드롭). μ는 normal→drift = 약 30% 수준으로 표현.
-  GRIP_DRIFT:       0.985, // 드리프트 中 — 횡속 거의 유지 (β 키우려 0.95→0.985)
-  DRIFT_SIDE_GRIP:  0.985, // alias — HOLD 中 횡속 retention (GRIP_DRIFT와 분리 튜닝 가능)
-  GRIP_NORMAL:      0.78,  // 평소 — 빠른 횡속 감쇠 (22%/프레임 손실 → 빠른 그립)
-  ROLL_FWD:         0.995, // 전진 구름저항
+  GRIP_DRIFT:       0.985, // 드리프트 中 — 횡속 거의 유지 (β 유지)
+  DRIFT_SIDE_GRIP:  0.985,
+  GRIP_NORMAL:      0.55,  // 0.78→0.55 — 평소 횡속 강하게 잡음 (얼음판 느낌 ❌, "꽉 잡힘")
+  ROLL_FWD:         0.995,
 
   // ── 속도 티어 (km/h) ───────────────────────────────────────
   CRUISE_MUL:  1.35,
@@ -66,10 +66,10 @@ export const KART_TUNING = {
   // 종료 시 velocity 스냅 ❌. 관성 그대로 두고 heading만 진행방향으로 회전.
   // 횡속은 RECOVER_GRIP로 천천히 블리드 → 잠깐 미끄러지는 '활주' 구간.
   // heading 회전은 1회 수렴(임계감쇠), 도달 후 정지 → fishtail 방지.
-  RECOVER_DURATION:   0.45,           // s — 회복 윈도우 (활주 + 회전 진행)
-  RECOVER_YAW_RATE:   5.5,            // rad/s (~315°/s) — heading→velocity 1회 회전
-  RECOVER_GRIP:       0.92,           // 횡속 retention (NORMAL 0.78보다 느슨 — 활주감)
-  RECOVER_OVERSHOOT:  0,              // rad — 0=칼정렬, >0=한 번만 살짝 넘침
+  RECOVER_DURATION:   0.18,           // 0.45→0.18 — 드리프트 종료 직후 짧고 단호한 스냅
+  RECOVER_YAW_RATE:   7.5,            // 5.5→7.5 — heading 정렬 더 빠르게
+  RECOVER_GRIP:       0.62,           // 0.92→0.62 — 라인 "탁!" 잡힘
+  RECOVER_OVERSHOOT:  0,
 
   // ── 차량동역학 골격 (analytics + 6단계 상태머신용) ─────────────
   // 아케이드 위에 '관측/분류' 레이어로 얹힘. 손맛은 아래 RECOVER_*/GRIP_* 가 우선.
@@ -134,8 +134,8 @@ export const KART_CAMERA = {
   CAM_DIST_SPEED_ADD: 10,
 
   // ── FOV 속도 비례 ──
-  FOV_BASE:        72,
-  FOV_MAX:         90,
+  FOV_BASE:        64,    // 72→64 (정지 시 기본)
+  FOV_MAX:         88,    // 90→88 (최고속도 시)
   FOV_LERP:        0.08,    // 부드러움 계수 (60fps 기준, dt 보정됨)
   FOV_BOOST_BUMP:  6,       // boost 中 추가 FOV
 
