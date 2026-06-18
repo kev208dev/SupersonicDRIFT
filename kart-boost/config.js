@@ -112,12 +112,12 @@ export const KART_TUNING = {
   START_BOOST_DV:           75,
   START_BOOST_SUSTAIN_TIME: 1.6,
 
-  // ── 조향 응답 (비드리프트) ──────────────────────────────────
+  // ── 조향 응답 (비드리프트) ── PC: 묵직하게 쌓이게.
   STEER_RESPONSE_DRIFT:  11.0,
-  STEER_ENGAGE:           15.0,
-  STEER_RETURN:           20.0,
-  MAX_YAW:                2.3,
-  HIGHSPEED_TURN_FACTOR:  0.55,
+  STEER_ENGAGE:           7.5,    // 15→7.5 — 조향이 천천히 쌓이게(휙 안 돌아감)
+  STEER_RETURN:          14.0,    // 20→14 — 복귀도 묵직
+  MAX_YAW:                1.7,    // 2.3→1.7 — 최대 yaw rate 하향 (트위치 제거)
+  HIGHSPEED_TURN_FACTOR:  0.50,   // 0.55→0.50 — 고속에서 더 둔하게
 
   // ── 드리프트 진입 최저속 ───────────────────────────────────
   MIN_DRIFT_SPEED: 28,

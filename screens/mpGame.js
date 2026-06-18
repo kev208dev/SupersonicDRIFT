@@ -617,12 +617,13 @@ function _updateCamera(dt) {
   const LOOK_AHEAD = isHigh ? 20 : isHood ? 155 : KART_CAMERA.CAM_LOOK_AHEAD;
   const LOOK_Y_BASE = isHigh ? 0 : isHood ? 10.5 : KART_CAMERA.CAM_LOOK_Y;
 
-  const moving = Math.hypot(car.vx, car.vy) > 5;
-  const targetCam = moving ? Math.atan2(car.vy, car.vx) : car.angle;
+  // 후진 시 시점 그대로(carAngle 유지).
+  const movingFwd = (car.forwardSpeed || 0) > 5;
+  const targetCam = movingFwd ? Math.atan2(car.vy, car.vx) : car.angle;
   let dA = targetCam - _camAngle;
   while (dA > Math.PI) dA -= Math.PI * 2;
   while (dA < -Math.PI) dA += Math.PI * 2;
-  const angK = 1 - Math.exp(-9.0 * dt);
+  const angK = 1 - Math.exp(-5.0 * dt);
   _camAngle += dA * angK;
 
   // PC: 드리프트 yaw 오프셋 ❌. 카메라는 velocity만.

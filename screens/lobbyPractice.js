@@ -460,10 +460,10 @@ function updateLobbyCamera(dt) {
   const LOOK_AHEAD = KART_CAMERA.CAM_LOOK_AHEAD;
   const LOOK_Y = KART_CAMERA.CAM_LOOK_Y;
 
-  // PC: 카메라는 velocity 추적, drift yaw 오프셋 ❌.
+  // PC: 카메라는 velocity 추적, drift yaw 오프셋 ❌. 후진 시 시점 그대로.
   car._camDriftYaw = 0;
-  const moving = Math.hypot(car.vx, car.vy) > 5;
-  const aimAngle = moving ? Math.atan2(car.vy, car.vx) : car.angle;
+  const movingFwd = (car.forwardSpeed || 0) > 5;
+  const aimAngle = movingFwd ? Math.atan2(car.vy, car.vx) : car.angle;
   const cs = Math.cos(aimAngle), sn = Math.sin(aimAngle);
 
   const targetX = car.x - cs * DIST;
