@@ -1,7 +1,8 @@
 import { getSupabase } from './supabaseClient.js';
 import { safeNickname } from './nicknameFilter.js';
+import { getApiBase } from '../js/net/apiHost.js';
 
-const API_BASE = '';
+const API_BASE = getApiBase();
 const PROFILE_KEY = 'racing_player_profile';
 export const LOCAL_LEADERBOARD_KEY = 'racingLeaderboardRecords';
 const GUEST_NICKNAME_KEY = 'racingGuestNickname';

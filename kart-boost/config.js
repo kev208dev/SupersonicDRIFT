@@ -132,9 +132,9 @@ export const KART_TUNING = {
   STEER_SMOOTH:           0.15,  // 0.20→0.15 — 살짝 경쾌 (굼뜸 제거)
   STEER_ENGAGE:           6.7,   // = 1/STEER_SMOOTH
   STEER_RETURN:          11.0,   // 9→11 — 복귀 약간 빠르게
-  MAX_YAW:                1.25,  // 1.0→1.25 — yaw 상한 살짝 ↑ (홱 도는 수준은 X)
-  MAX_YAW_RATE_NORMAL:    1.25,  // alias
-  HIGHSPEED_TURN_FACTOR:  0.45,
+  MAX_YAW:                1.5,   // 1.25→1.5 — 일반 조향 캡 ↑ (방향전환 답답함 제거)
+  MAX_YAW_RATE_NORMAL:    1.5,
+  HIGHSPEED_TURN_FACTOR:  0.60,  // 0.45→0.60 — 고속서도 충분히 돌아감
 
   // ── 드리프트 진입 최저속 ───────────────────────────────────
   MIN_DRIFT_SPEED: 28,

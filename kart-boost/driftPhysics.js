@@ -336,6 +336,8 @@ export function updateDriftStateMachine(car, input, dt) {
 
   const handbrake = !!input.handbrake;
   const speed     = Math.hypot(car.vx, car.vy);
+  // 전진 속도 — 후진 中 드리프트 진입 차단.
+  const vFwd      = car.vx * Math.cos(car.angle) + car.vy * Math.sin(car.angle);
 
   if (car.driftState === 'idle' || car.driftState === 'release') {
     const steerSign = Math.sign(input.steer || 0);
@@ -345,7 +347,8 @@ export function updateDriftStateMachine(car, input, dt) {
       && car.frictionCircleOver
       && hasSteer
       && speed > (K.FRICTION_TRIGGER_MIN_SPEED || 60);
-    if ((handbrake || frictionTrigger) && hasSteer && speed > K.MIN_DRIFT_SPEED) {
+    // 전진 中에만 드리프트 진입. 후진(vFwd<0) → 진입 ❌.
+    if ((handbrake || frictionTrigger) && hasSteer && vFwd > K.MIN_DRIFT_SPEED) {
       car.driftState     = 'charge';
       car.driftStateTime = 0;
       car.drifting       = true;
@@ -365,6 +368,10 @@ export function updateDriftStateMachine(car, input, dt) {
   } else if (car.driftState === 'charge') {
     car.drifting = true;
     if (!handbrake) {
+      endDriftRoutine(car, 'manual');
+    }
+    // 후진 진입 시 강제 종료 — 역방향 드리프트 이상거동 방지.
+    if (vFwd < 0) {
       endDriftRoutine(car, 'manual');
     }
   }

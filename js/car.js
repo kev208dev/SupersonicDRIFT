@@ -257,7 +257,16 @@ export function updateCar3D(mesh3d, car, input, track = null, dt = 1 / 60) {
     const targetRoll = (rAvg2 - lAvg) * 0.02 + driftLean + wallRideLean + steerRoll;
     mesh3d.body.rotation.z += (targetPitch - mesh3d.body.rotation.z) * 0.20;
     mesh3d.body.rotation.x += (targetRoll - mesh3d.body.rotation.x) * 0.20;
+    // 코스메틱 롤/피치 ±5° 하드 클램프 — 차체 굴러 눕는 것 금지.
+    const TILT_MAX = 5 * Math.PI / 180;
+    if (mesh3d.body.rotation.x > TILT_MAX) mesh3d.body.rotation.x = TILT_MAX;
+    else if (mesh3d.body.rotation.x < -TILT_MAX) mesh3d.body.rotation.x = -TILT_MAX;
+    if (mesh3d.body.rotation.z > TILT_MAX) mesh3d.body.rotation.z = TILT_MAX;
+    else if (mesh3d.body.rotation.z < -TILT_MAX) mesh3d.body.rotation.z = -TILT_MAX;
   }
+  // 루트는 yaw만 — pitch/roll 강제 0 (외부 시스템 안전망).
+  mesh3d.rotation.x = 0;
+  mesh3d.rotation.z = 0;
 
   for (const wg of (mesh3d.wheelGroups || [])) {
     // Keep tires planted. Suspension now moves only the body so the wheels do

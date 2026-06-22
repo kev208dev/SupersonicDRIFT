@@ -517,8 +517,21 @@ function normalizeColor(value) {
   return /^#[0-9a-fA-F]{6}$/.test(text) ? text : null;
 }
 
+function setLeaderboardCors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 const server = createServer(async (req, res) => {
   try {
+    const isLeaderboard = req.url.startsWith('/api/leaderboard');
+    if (isLeaderboard) setLeaderboardCors(res);
+    if (isLeaderboard && req.method === 'OPTIONS') {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
     if (req.method === 'GET' && req.url.startsWith('/api/leaderboard/stream')) {
       handleStream(req, res);
     } else if (req.method === 'GET' && req.url.startsWith('/api/leaderboard')) {

@@ -1,6 +1,8 @@
 // Client-side WebSocket wrapper for the multiplayer server.
 // Lightweight: connect, send JSON, dispatch typed events, reconnect-with-backoff.
 
+import { getApiHost } from './apiHost.js';
+
 const RECONNECT_INITIAL_MS = 800;
 const RECONNECT_MAX_MS = 8000;
 const PING_INTERVAL_MS = 12000;
@@ -123,7 +125,12 @@ export class MpClient extends EventTarget {
 }
 
 function buildWsUrl() {
-  const loc = window.location;
-  const scheme = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${scheme}//${loc.host}/api/mp`;
+  const host = getApiHost();
+  let scheme;
+  if (host.includes('localhost') || host.includes('127.0.0.1')) {
+    scheme = 'ws:';
+  } else {
+    scheme = 'wss:';
+  }
+  return `${scheme}//${host}/api/mp`;
 }
