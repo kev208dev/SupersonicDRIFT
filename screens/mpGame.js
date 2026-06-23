@@ -30,6 +30,7 @@ import { makeDriftFxState, applyDriftBodyFx, emitDriftSparks, emitDriftSmoke } f
 import { RemoteCarInterp } from '../js/net/interp.js';
 import { getSharedRenderer } from '../js/renderer.js';
 import { checkVehicleCollisions } from '../js/competitionCollision.js';
+import { showRaceCountdown, updateRaceCountdown, hideRaceCountdown } from '../js/effects/raceCountdown.js';
 
 const FIXED_DT = 1 / 60;
 const STATE_SEND_HZ = 30;
@@ -211,10 +212,12 @@ export function initMpGame({
   }
 
   startEngine();
+  showRaceCountdown();
 }
 
 export function stopMpGame(options = {}) {
   running = false;
+  hideRaceCountdown();
   for (const fn of mpUnsubs) { try { fn(); } catch {} }
   mpUnsubs = [];
   stopEngine();
@@ -261,6 +264,7 @@ export function updateMpGame(dt, now) {
   // Countdown gating uses server's startAt (Date.now-based).
   const wallNow = Date.now();
   const msUntilStart = mpStartAt - wallNow;
+  if (!raceReleased) updateRaceCountdown(msUntilStart / 1000);
   const wasReleased = raceReleased;
   raceReleased = msUntilStart <= 0;
   if (!wasReleased && raceReleased && timing && !timing.started) {
@@ -330,7 +334,7 @@ export function updateMpGame(dt, now) {
   updateScenery(propsGroup, now);
 
   // Remote ghosts
-  _updateRemoteCars(now);
+  _updateRemoteCars(now, dt);
   _checkMultiplayerVehicleCollisions();
 
   // Camera follows local car
@@ -467,7 +471,13 @@ function _makeSyntheticCar(x, y, angle) {
   };
 }
 
-function _updateRemoteCars(now) {
+// 보간 — dt-independent: t = 1 - pow(decay, dt). decay 작을수록 빠른 수렴.
+const _REMOTE_POS_DECAY = 0.0009;   // 위치 — 작을수록 빠르게 따라감
+const _REMOTE_ANG_DECAY = 0.002;    // 각도 — 약간 더 느슨
+const _REMOTE_VEL_DECAY = 0.005;
+const _SNAP_DIST_SQ     = 2500;     // 50u 이상 차이 = 즉시 스냅 (텔레포트)
+
+function _updateRemoteCars(now, dt = 1 / 60) {
   for (const ghost of remotePlayers.values()) {
     const sample = ghost.interp.sample(performance.now());
     const age = performance.now() - (ghost.lastUpdateTime || 0);
@@ -481,23 +491,33 @@ function _updateRemoteCars(now) {
     });
     if (!sample || !ghost.visible) continue;
     const synth = ghost.syntheticCar;
-    // Smooth remote visuals so 20Hz network snapshots do not pop or twitch.
-    const blend = 0.55;
-    const snapDist2 = (sample.x - synth.x) ** 2 + (sample.y - synth.y) ** 2;
-    if (snapDist2 > 2500) {
-      synth.x = sample.x;
-      synth.y = sample.y;
-      synth.angle = sample.a;
+    // 첫 샘플 → 보간 없이 즉시 세팅 (먼 곳서 날아오는 현상 ❌).
+    if (!ghost._init) {
+      ghost._init = true;
+      synth.x = sample.x; synth.y = sample.y; synth.angle = sample.a;
+      synth.vx = sample.vx; synth.vy = sample.vy;
     } else {
-      synth.x += (sample.x - synth.x) * blend;
-      synth.y += (sample.y - synth.y) * blend;
-      let da = sample.a - synth.angle;
-      while (da > Math.PI) da -= Math.PI * 2;
-      while (da < -Math.PI) da += Math.PI * 2;
-      synth.angle += da * 0.58;
+      const dx = sample.x - synth.x;
+      const dy = sample.y - synth.y;
+      if (dx * dx + dy * dy > _SNAP_DIST_SQ) {
+        // 너무 멀면 스냅 (랩 wrap 등).
+        synth.x = sample.x; synth.y = sample.y; synth.angle = sample.a;
+      } else {
+        // dt-independent 보간 — Vector3.lerp 동등 식.
+        const tp = 1 - Math.pow(_REMOTE_POS_DECAY, dt);
+        synth.x += dx * tp;
+        synth.y += dy * tp;
+        // 각도 wrap 후 slerp 동등 (1D).
+        let da = sample.a - synth.angle;
+        while (da > Math.PI)  da -= Math.PI * 2;
+        while (da < -Math.PI) da += Math.PI * 2;
+        const ta = 1 - Math.pow(_REMOTE_ANG_DECAY, dt);
+        synth.angle += da * ta;
+      }
     }
-    synth.vx += (sample.vx - synth.vx) * 0.48;
-    synth.vy += (sample.vy - synth.vy) * 0.48;
+    const tv = 1 - Math.pow(_REMOTE_VEL_DECAY, dt);
+    synth.vx += (sample.vx - synth.vx) * tv;
+    synth.vy += (sample.vy - synth.vy) * tv;
     synth.gear = sample.g;
     synth.drifting = sample.drift;
     synth.boosting = sample.boost;
@@ -558,7 +578,7 @@ function _makeNameSprite(name, color) {
   ctx.beginPath();
   ctx.arc(28, 32, 9, 0, Math.PI * 2);
   ctx.fill();
-  ctx.font = 'bold 22px system-ui, sans-serif';
+  ctx.font = "bold 22px 'Chakra Petch', system-ui, sans-serif";
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
@@ -597,7 +617,7 @@ function _emitDriftFx(dt, driveInput) {
     if (prev) {
       const dx = wx - prev.x, dz = w3z - prev.z;
       if (dx * dx + dz * dz > 4.0) {
-        skidBuf.appendTrail(prev.x, prev.z, wx, w3z, 0.65, _mpDriftTrailColor(car));
+        skidBuf.appendTrail(prev.x, prev.z, wx, w3z, 0.45, _mpDriftTrailColor(car));
         car[key] = { x: wx, z: w3z };
       }
     } else {
@@ -606,18 +626,8 @@ function _emitDriftFx(dt, driveInput) {
   }
 }
 
-function _mpDriftTrailColor(c) {
-  const meter = Math.max(0, Math.min(100, c?.boostMeter || 0));
-  const stock = Math.max(0, Math.min(2, c?.boostStock || 0));
-  const t = Math.min(1, (stock * 100 + meter) / 200);
-  const lo = KART_CAMERA.TRAIL_COLOR_LOW ?? 0xfff099;
-  const hi = KART_CAMERA.TRAIL_COLOR_HIGH ?? 0x6688ff;
-  const ar = (lo >> 16) & 0xff, ag = (lo >> 8) & 0xff, ab = lo & 0xff;
-  const br = (hi >> 16) & 0xff, bg = (hi >> 8) & 0xff, bb = hi & 0xff;
-  const r = Math.round(ar + (br - ar) * t);
-  const g = Math.round(ag + (bg - ag) * t);
-  const bl = Math.round(ab + (bb - ab) * t);
-  return (r << 16) | (g << 8) | bl;
+function _mpDriftTrailColor(_c) {
+  return KART_CAMERA.SKID_MARK_COLOR ?? 0x141414;
 }
 
 function _updateCamera(dt) {
@@ -714,34 +724,17 @@ function _renderHUD(dt, kmh, msUntilStart) {
   drawSpeedLines(hudCtx, speedLines, kmh, hudCanvas.width, hudCanvas.height, dt, cameraMode, boostT);
   drawHUD(hudCtx, car, timing, hudCanvas.width, hudCanvas.height, track, null);
   if (banner) _drawLapBanner(hudCtx, hudCanvas.width, hudCanvas.height);
-  if (!raceReleased) _drawCountdownOverlay(hudCtx, hudCanvas.width, hudCanvas.height, msUntilStart);
+  // 카운트다운 → js/effects/raceCountdown.js MagicRings 오버레이.
   _drawLapCounter(hudCtx, hudCanvas.width, hudCanvas.height);
   if (myFinished) _drawWaitingBanner(hudCtx, hudCanvas.width, hudCanvas.height);
 }
 
 function _drawLapCounter(ctx, w, h) {
   ctx.save();
-  ctx.font = 'bold 18px monospace';
+  ctx.font = "bold 18px 'IBM Plex Mono', monospace";
   ctx.fillStyle = '#ffd166';
   ctx.textAlign = 'right';
   ctx.fillText(`LAP ${Math.min(myLapCount + (raceReleased && !myFinished ? 1 : 0), lapTarget)} / ${lapTarget}`, w - 24, 38);
-  ctx.restore();
-}
-
-function _drawCountdownOverlay(ctx, w, h, msUntilStart) {
-  const seconds = Math.max(0, msUntilStart / 1000);
-  ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.42)';
-  ctx.fillRect(0, 0, w, h);
-  ctx.font = 'bold 110px monospace';
-  ctx.fillStyle = seconds > 0.5 ? '#ffd166' : '#79e2cb';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const label = seconds > 3 ? 'GET READY' : seconds > 0.4 ? String(Math.ceil(seconds)) : 'GO!';
-  ctx.fillText(label, w / 2, h * 0.42);
-  ctx.font = 'bold 18px system-ui';
-  ctx.fillStyle = '#c0c5cf';
-  ctx.fillText(`${remotePlayers.size + 1}명이 함께 출발합니다`, w / 2, h * 0.52);
   ctx.restore();
 }
 
@@ -755,11 +748,11 @@ function _drawLapBanner(ctx, w, h) {
   ctx.strokeStyle = banner.isNew ? '#ff66ff' : '#ffd23c';
   ctx.lineWidth = 4;
   ctx.strokeRect(0, cy - 60, w, 130);
-  ctx.font = 'bold 18px monospace';
+  ctx.font = "bold 18px 'IBM Plex Mono', monospace";
   ctx.fillStyle = banner.isNew ? '#ff66ff' : '#ffd23c';
   ctx.textAlign = 'center';
   ctx.fillText(banner.sub, cx, cy - 24);
-  ctx.font = 'bold 64px monospace';
+  ctx.font = "bold 64px 'IBM Plex Mono', monospace";
   ctx.fillStyle = '#fff';
   ctx.fillText(banner.text, cx, cy + 38);
   ctx.restore();
@@ -769,7 +762,7 @@ function _drawWaitingBanner(ctx, w, h) {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.42)';
   ctx.fillRect(0, h - 84, w, 84);
-  ctx.font = 'bold 22px system-ui';
+  ctx.font = "bold 22px 'Chakra Petch', system-ui";
   ctx.fillStyle = '#79e2cb';
   ctx.textAlign = 'center';
   ctx.fillText('FINISHED · 다른 플레이어 대기 중', w / 2, h - 48);

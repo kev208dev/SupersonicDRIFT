@@ -1,4 +1,4 @@
-import { initModeSelect }  from './screens/modeSelect.js';
+// modeSelect 페이지 삭제됨
 import { initTrackSelect }  from './screens/trackSelect.js';
 import { TRACKS }           from './data/tracks.js';
 import { initGame, updateGame, stopGame } from './screens/game.js';
@@ -104,7 +104,7 @@ function screenId(screenName) {
     main: 'screen-main',
     login: 'screen-auth',
     auth: 'screen-auth',
-    modeSelect: 'screen-modeselect',
+    // modeSelect removed
     trackSelect: 'screen-trackselect',
     friendlyRoom: 'screen-lobby',
     rankedLobby: 'screen-lobby',
@@ -151,6 +151,15 @@ function getActiveScreen() {
   return active?.dataset?.screen || active?.id || currentScreen || null;
 }
 
+// Rank Game 즉시 진입 — SD 메뉴 카드용. trackSelect 건너뜀.
+window.skipToRankedLobby = () => {
+  if (typeof ensureDefaultLoadout === 'function') ensureDefaultLoadout();
+  selectedMode = 'ranked';
+  if (typeof selectGameMode === 'function') selectGameMode('ranked');
+  selectedTrack = selectedTrack || TRACKS[0];
+  selectedRaceOptions = { mode: 'ranked' };
+  if (typeof goToLobby === 'function') goToLobby();
+};
 window.showScreen = showScreen;
 window.hideAllScreens = hideAllScreens;
 window.setActiveScreen = setActiveScreen;
@@ -191,6 +200,8 @@ function initMainScreen() {
   renderSeasonPanel();
   renderMissionPanel();
   if (!initFlags.mainLeaderboardPreview) _loadMainLeaderboardPreview();
+  // Supersonic Drift 메인메뉴 (Stage 1: 배경 + ASCII 타이틀)
+  import('./js/menu/supersonicMenu.js').then(m => m.initSupersonicMenu()).catch(err => console.warn('SD menu init failed:', err));
 }
 
 function renderLobbyHub() {
@@ -284,18 +295,7 @@ function ensureDefaultLoadout() {
   selectCarAndSkin(selectedCar?.id, selectedSkin?.id || 'default');
 }
 
-function goToModeSelect(backCb = () => goToMain()) {
-  ensureDefaultLoadout();
-  showScreen('modeSelect');
-  initModeSelect(
-    (mode) => {
-      selectedMode = mode;
-      selectGameMode(mode);
-      goToTrackSelect();
-    },
-    backCb
-  );
-}
+// goToModeSelect — 삭제됨. SD 메뉴 ASCII 클릭 → 바로 연습장 진입.
 
 function goToLobby(existingNet = null, options = {}) {
   if (!selectedCar) ensureDefaultLoadout();
@@ -308,7 +308,7 @@ function goToLobby(existingNet = null, options = {}) {
     (car, track, room, net, startAt, myClientId) => {
       goToMpGame(car, track, room, net, startAt, myClientId);
     },
-    () => { goToModeSelect(); },
+    () => { goToMain(); },
     existingNet,
     options
   );
@@ -374,7 +374,7 @@ function goToTrackSelect() {
       if (selectedMode === 'ranked' || selectedMode === 'friendly') goToLobby();
       else goToGame();
     },
-    ()      => { goToModeSelect(); },
+    ()      => { goToMain(); },
     { mode: selectedMode }
   );
 }
@@ -622,6 +622,7 @@ function _openLeaderboardOverlay() {
   trackEvent('leaderboard_open', { source: returnScreenAfterPanel });
   _loadGlobalLeaderboard();
 }
+window.openLeaderboardOverlay = _openLeaderboardOverlay;
 
 function _wireGlobalLeaderboard() {
   const openBtn = document.getElementById('btn-open-leaderboard');
@@ -995,11 +996,7 @@ function _escape(value) {
 }
 
 function normalizeStaticScreenCopy() {
-  const modeTitle = document.querySelector('#screen-modeselect .screen-header h1');
-  const modeSubtitle = document.querySelector('#screen-modeselect .screen-header .subtitle');
   const lobbyTitle = document.querySelector('#screen-lobby .screen-header h1');
-  if (modeTitle) modeTitle.textContent = 'Game Mode Select';
-  if (modeSubtitle) modeSubtitle.textContent = 'Choose ranked, time trial, or friendly racing.';
   if (lobbyTitle) lobbyTitle.textContent = 'Race Lobby';
 }
 

@@ -1,7 +1,7 @@
 // 실시간 튜닝 패널 — 주행 중 드리프트 상수 즉시 조절. 로직 ❌, 값만.
 // 토글: F4. 조작: ↑↓ 선택, ←→ (또는 -/=) 증감. 변경 시 콘솔에 'NAME = value' 출력.
 
-import { KART_TUNING as K } from '../kart-boost/config.js';
+import { KART_TUNING as K, KART_CAMERA as KC } from '../kart-boost/config.js';
 
 let _panelOn = false;
 let _selected = 0;
@@ -19,6 +19,34 @@ const ITEMS = [
     get: () => K.COUNTER_STEER_RECOVERY_RATE,
     set: v => { K.COUNTER_STEER_RECOVERY_RATE = v; },
     step: 1.0, min: 1, max: 30, fmt: 2 },
+  { name: 'DRIFT_GRACE_TIME',
+    get: () => K.DRIFT_GRACE_TIME,
+    set: v => { K.DRIFT_GRACE_TIME = v; },
+    step: 0.02, min: 0, max: 0.6, fmt: 3 },
+  { name: 'IDLE_SLIP_DECAY',
+    get: () => K.IDLE_SLIP_DECAY,
+    set: v => { K.IDLE_SLIP_DECAY = v; },
+    step: 0.1, min: 0, max: 5, fmt: 2 },
+  { name: 'IDLE_STEER_DEAD',
+    get: () => K.IDLE_STEER_DEAD,
+    set: v => { K.IDLE_STEER_DEAD = v; },
+    step: 0.01, min: 0, max: 0.3, fmt: 2 },
+  { name: 'LEAN_DAMPING',
+    get: () => KC.LEAN_DAMPING,
+    set: v => { KC.LEAN_DAMPING = v; },
+    step: 0.02, min: 0.04, max: 0.5, fmt: 3 },
+  { name: 'YAW_DAMPING',
+    get: () => K.YAW_DAMPING,
+    set: v => { K.YAW_DAMPING = v; },
+    step: 0.05, min: 0, max: 1.0, fmt: 3 },
+  { name: 'MAX_YAW_ACCEL',
+    get: () => K.MAX_YAW_ACCEL,
+    set: v => { K.MAX_YAW_ACCEL = v; },
+    step: 0.5, min: 1, max: 30, fmt: 2 },
+  { name: 'YAW_RATE_SMOOTH',
+    get: () => K.YAW_RATE_SMOOTH,
+    set: v => { K.YAW_RATE_SMOOTH = v; },
+    step: 0.25, min: 0.5, max: 12, fmt: 2 },
   // STEER_SMOOTH 바뀌면 실제 작동값 STEER_ENGAGE 도 1/SMOOTH 로 자동 갱신.
   { name: 'STEER_SMOOTH',
     get: () => K.STEER_SMOOTH,
@@ -38,11 +66,26 @@ const ITEMS = [
     get: () => K.DRIFT_KBASE,
     set: v => { K.DRIFT_KBASE = v; },
     step: 1, min: 0, max: 30, fmt: 1 },
-  // MAX_SPEED = maxSpeed × CRUISE_MUL × V_BOOST_MUL. 여기서는 CRUISE_MUL 조절.
-  { name: 'MAX_SPEED_MUL_CRUISE',
-    get: () => K.CRUISE_MUL,
-    set: v => { K.CRUISE_MUL = v; },
-    step: 0.05, min: 0.3, max: 2.0, fmt: 3 },
+  { name: 'MAX_SPEED',
+    get: () => K.MAX_SPEED,
+    set: v => { K.MAX_SPEED = v; },
+    step: 10, min: 80, max: 400, fmt: 1 },
+  { name: 'BOOST_MAX_SPEED',
+    get: () => K.BOOST_MAX_SPEED,
+    set: v => { K.BOOST_MAX_SPEED = v; },
+    step: 10, min: 100, max: 500, fmt: 1 },
+  { name: 'BOOST_INSTANT_DV',
+    get: () => K.BOOST_INSTANT_DV,
+    set: v => { K.BOOST_INSTANT_DV = v; },
+    step: 5, min: 0, max: 200, fmt: 1 },
+  { name: 'BOOST_SUSTAIN_ACCEL',
+    get: () => K.BOOST_SUSTAIN_ACCEL,
+    set: v => { K.BOOST_SUSTAIN_ACCEL = v; },
+    step: 10, min: 0, max: 400, fmt: 1 },
+  { name: 'DRIFT_SIDE_GRIP',
+    get: () => K.DRIFT_SIDE_GRIP,
+    set: v => { K.DRIFT_SIDE_GRIP = v; K.GRIP_DRIFT = v; },
+    step: 0.005, min: 0.90, max: 1.0, fmt: 4 },
 ];
 
 function _adjust(dir) {

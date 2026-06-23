@@ -517,7 +517,7 @@ function _emitLobbySkid() {
   const a = car.angle;
   const cs = Math.cos(a), sn = Math.sin(a);
   const rearOffset = -7.6, sideOffset = 7.2;
-  const col = 0x9aa0a6; // 연회색 — 본게임과 통일
+  const col = 0x141414; // 검은 타이어 자국
   for (const side of [-1, 1]) {
     const wx = car.x + rearOffset * cs - side * sideOffset * sn;
     const wy = car.y + rearOffset * sn + side * sideOffset * cs;
@@ -526,7 +526,7 @@ function _emitLobbySkid() {
     if (prev) {
       const dx = wx - prev.x, dz = -wy - prev.z;
       if (dx * dx + dz * dz > 4) {
-        skidBuf.appendTrail(prev.x, prev.z, wx, -wy, 1.15, col);
+        skidBuf.appendTrail(prev.x, prev.z, wx, -wy, 0.45, col);
         car[key] = { x: wx, z: -wy };
       }
     } else {

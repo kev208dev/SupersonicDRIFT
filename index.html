@@ -8,9 +8,17 @@
     ></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NEON APEX</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <title>SuperSonic Drift</title>
+    <link rel="icon" type="image/png" href="assets/SSD-Logo-Assets/favicon-brand.png" />
+    <link rel="apple-touch-icon" href="assets/SSD-Logo-Assets/app-icon.png" />
+    <meta property="og:title" content="SuperSonic Drift" />
+    <meta property="og:image" content="assets/SSD-Logo-Assets/social-avatar.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="assets/SSD-Logo-Assets/social-avatar.png" />
     <link rel="stylesheet" href="style.css?v=20260601-ux3" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
     <script type="importmap">
       {
         "imports": {
@@ -88,7 +96,7 @@
             <header class="lobby-topbar">
               <div>
                 <p class="main-kicker">Neon Circuit Lobby</p>
-                <h1>NEON APEX</h1>
+                <h1>SUPERSONIC DRIFT</h1>
               </div>
               <div class="lobby-top-meta">
               <span id="lobby-current-car">Selected Car</span>
@@ -313,19 +321,8 @@
       </div>
     </div>
 
-    <div id="screen-modeselect" class="screen" data-screen="modeSelect" aria-hidden="true">
-      <div class="screen-header">
-        <h1>Game Mode Select</h1>
-        <p class="subtitle">Choose ranked, time trial, or friendly racing.</p>
-      </div>
-      <div class="mode-grid" id="game-mode-grid"></div>
-      <div class="screen-footer">
-        <button class="btn-secondary" id="btn-back-mode-skin">
-          Back
-        </button>
-        <div></div>
-      </div>
-    </div>
+    <!-- screen-modeselect 삭제됨 -->
+
     <div id="screen-lobby" class="screen" data-screen="lobby" aria-hidden="true">
       <div class="screen-header">
         <h1>Race Lobby</h1>
@@ -395,7 +392,7 @@
           </div>
 
           <button class="btn-link" id="btn-lobby-back" type="button">
-            Back to Mode Select
+            ← Back to Menu
           </button>
           <div class="lobby-conn-state" id="lobby-conn-state">
             Connecting...
@@ -507,8 +504,10 @@
         </div>
         <!-- 숨김: 자동 저장되므로 수동 저장 버튼 불필요 -->
         <button class="btn-secondary" id="btn-submit-score" type="button" hidden>기록 저장</button>
-        <!-- 광고: 실제 광고 로드 시에만 표시 -->
-        <div id="ad-game-over-banner" class="result-ad-slot" hidden></div>
+        <!-- 광고 — 자리 항상 확보. 실제 광고는 js/ads.js에서 주입. -->
+        <div id="ad-game-over-banner" class="result-ad-slot ad-placeholder">
+          <span>Advertisement</span><small>Ad Space</small>
+        </div>
         <button class="btn-secondary rewarded-ad-button" id="btn-rewarded-continue" type="button" hidden>Watch Ad</button>
       </div>
     </div>

@@ -90,8 +90,9 @@ export function stepKartDrift(car, input, dt, track) {
   updateDriftStateMachine(car, input, dt);
   updateBoostState(car, input, dt);
 
-  const maxCruise = Math.max(120, (car.maxSpeed || 180)) * (K.CRUISE_MUL || 1);
-  const maxBoost  = maxCruise * K.V_BOOST_MUL;
+  // MAX_SPEED / BOOST_MAX_SPEED 우선. 없으면 maxSpeed × MUL fallback.
+  const maxCruise = K.MAX_SPEED || (Math.max(120, (car.maxSpeed || 180)) * (K.CRUISE_MUL || 1));
+  const maxBoost  = K.BOOST_MAX_SPEED || (maxCruise * (K.V_BOOST_MUL || 1.3));
   const topCap    = currentTopCap(car, maxCruise, maxBoost);
   car.maxCapNow   = topCap;
 
@@ -137,9 +138,16 @@ export function stepKartDrift(car, input, dt, track) {
       // 즉발 스냅 ❌, 슬립각이 시간에 걸쳐 부드럽게 쌓임.
       const buildT = K.SLIP_BUILD_TIME || 0.35;
       const slipBuildup = Math.min(1, (car.driftStateTime || 0) / Math.max(1e-3, buildT));
-      const targetYawRate = -input.steer * K.DRIFT_YAW * Math.max(0.35, speedRatio) * dirSign * driftGate * mulHold * slipBuildup;
+      let targetYawRate = -input.steer * K.DRIFT_YAW * Math.max(0.35, speedRatio) * dirSign * driftGate * mulHold * slipBuildup;
       car._driftYawRate = car._driftYawRate || 0;
-      car._driftYawRate += (targetYawRate - car._driftYawRate) * (1 - Math.exp(-K.DRIFT_YAW_SMOOTH * dt));
+      targetYawRate -= car._driftYawRate * (K.YAW_DAMPING || 0);
+      // 부드러운 yaw — smoothing + max angular accel clamp (휙 ❌).
+      const yawSmooth = K.YAW_RATE_SMOOTH ?? K.DRIFT_YAW_SMOOTH ?? 6.0;
+      let yawDelta = (targetYawRate - car._driftYawRate) * (1 - Math.exp(-yawSmooth * dt));
+      const maxAccel = (K.MAX_YAW_ACCEL || 8.0) * dt;
+      if (yawDelta >  maxAccel) yawDelta =  maxAccel;
+      if (yawDelta < -maxAccel) yawDelta = -maxAccel;
+      car._driftYawRate += yawDelta;
       car.angle += car._driftYawRate * dt;
     } else {
       car._driftYawRate = 0;
@@ -152,9 +160,25 @@ export function stepKartDrift(car, input, dt, track) {
     }
   }
 
+  // ─── 슬립 동결 판정 (point 2,3,4,5) ───
+  // 슬립 감소는 오직 카운터스티어 中에만 허용.
+  // - 무입력(idleSteer): freeze
+  // - inside-hold (드리프트와 같은 방향): freeze (slip 유지/심화는 drift 활성 中 E 항이 처리)
+  // - 카운터: !freeze → 정상 회복 항(A) 적용 + RECOVER 항 활성
+  // 저속(거의 정지)에선 freeze 의미 없으므로 자연 마찰 허용.
+  const steerMag = Math.abs(input.steer || 0);
+  const idleSteer = steerMag < (K.IDLE_STEER_DEAD ?? 0.05);
+  const carSpeedNow = Math.hypot(car.vx, car.vy);
+  let counterSteerNow = false;
+  if (!idleSteer && car._driftDir) {
+    const thr = K.COUNTER_STEER_THRESHOLD;
+    counterSteerNow = Math.sign(input.steer) === -car._driftDir && steerMag > thr;
+  }
+  const slipFreezeActive = !counterSteerNow && carSpeedNow > K.MIN_DRIFT_SPEED;
+
   // ─── 카운터스티어 회복 (drift 中만) ───
   // 카트라이더 리듬: 안쪽 hold = 슬립 유지/심화. 반대로 꺾으면 = 카운터 → 차 빠르게 펴짐.
-  // 카운터 안 하면 미세 자동 펴짐(천천히). 회복은 기본 '플레이어 카운터' 입력으로.
+  // 무입력 = 슬립 동결 (AUTO_RECOVER skip). 회복은 오직 플레이어 카운터로만.
   let counterSteer = false;
   if (car.drifting && car._driftDir !== 0) {
     const s = input.steer || 0;
@@ -167,15 +191,16 @@ export function stepKartDrift(car, input, dt, track) {
       const counterMag = Math.min(1, (Math.abs(s) - threshold) / Math.max(0.05, 1 - threshold));
       const rate = K.COUNTER_STEER_RECOVERY_RATE || 9.0;
       car.angle += delta * rate * counterMag * dt;
-    } else {
-      // 카운터 안 함: 미세 자동 펴짐 (천천히만, 급격한 자동 회복 X)
+    } else if (!(car._driftGraceT > 0) && !slipFreezeActive) {
+      // 카운터 안 함: 미세 자동 펴짐. grace 中 ❌ (톡톡이). 무입력 freeze 中 ❌ (슬립 동결).
       car.angle += delta * (K.AUTO_RECOVER_RATE || 1.2) * dt;
     }
   }
 
   // ─── 회복 페이즈: 차체 yaw → velocity 방향으로 1회 회전 (CM 관성 보존) ───
   // 도달 시점에 회전 정지 → 반복 진동(팽이) 차단. 횡속 블리드는 RECOVER_GRIP에서.
-  if (car._recoverActive && !car._recoverDone && Math.hypot(car.vx, car.vy) > 1) {
+  // 무입력 freeze 中 ❌ (자동 정렬 차단 — 카운터로만 회복).
+  if (car._recoverActive && !car._recoverDone && !slipFreezeActive && Math.hypot(car.vx, car.vy) > 1) {
     const velAngle = Math.atan2(car.vy, car.vx);
     const delta    = wrapAngle(velAngle - car.angle);
     const maxStep  = K.RECOVER_YAW_RATE * dt;
@@ -232,11 +257,19 @@ export function stepKartDrift(car, input, dt, track) {
   vF *= Math.pow(K.ROLL_FWD, frames);
 
   // μ 단절: drift 中 = GRIP_DRIFT, 회복 中 = RECOVER_GRIP(느슨, 활주), 평소 = GRIP_NORMAL.
-  const baseGrip = car.drifting
-    ? K.GRIP_DRIFT
-    : (car._recoverActive ? K.RECOVER_GRIP : K.GRIP_NORMAL);
+  // 무입력 freeze 中 = vL 그대로 보존 (또는 IDLE_SLIP_DECAY로 천천히 bleed).
+  let baseGrip;
+  if (car.drifting)            baseGrip = K.GRIP_DRIFT;
+  else if (slipFreezeActive)   baseGrip = 1.0;  // freeze (vL 보존)
+  else if (car._recoverActive) baseGrip = K.RECOVER_GRIP;
+  else                          baseGrip = K.GRIP_NORMAL;
   const sideRetention = isIce ? K.ICE_SIDE_RETENTION : baseGrip;
-  vL *= Math.pow(sideRetention, frames);
+  if (slipFreezeActive && (K.IDLE_SLIP_DECAY || 0) > 0) {
+    // 패널서 IDLE_SLIP_DECAY 올리면 천천히 bleed. 0이면 위 pow(1, frames)로 변화 없음.
+    vL *= Math.exp(-(K.IDLE_SLIP_DECAY) * dt);
+  } else {
+    vL *= Math.pow(sideRetention, frames);
+  }
 
   // ─── 재합성 ───
   car.vx = fwdX * vF + rgtX * vL;
@@ -367,11 +400,20 @@ export function updateDriftStateMachine(car, input, dt) {
     }
   } else if (car.driftState === 'charge') {
     car.drifting = true;
-    if (!handbrake) {
-      endDriftRoutine(car, 'manual');
+    // 톡톡이 grace — handbrake 떼도 DRIFT_GRACE_TIME 동안 드리프트 유지. 재탭 시 이어감.
+    if (handbrake) {
+      car._driftGraceT = null;
+    } else {
+      if (car._driftGraceT == null) car._driftGraceT = K.DRIFT_GRACE_TIME || 0.22;
+      car._driftGraceT -= dt;
+      if (car._driftGraceT <= 0) {
+        car._driftGraceT = null;
+        endDriftRoutine(car, 'manual');
+      }
     }
-    // 후진 진입 시 강제 종료 — 역방향 드리프트 이상거동 방지.
+    // 후진 진입 시 강제 종료.
     if (vFwd < 0) {
+      car._driftGraceT = null;
       endDriftRoutine(car, 'manual');
     }
   }

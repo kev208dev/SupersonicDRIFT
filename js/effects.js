@@ -117,7 +117,7 @@ export function createSkidBuffer(scene, capSegments = 400) {
   const mat = new THREE.MeshBasicMaterial({
     vertexColors: true,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.55,
     blending: THREE.NormalBlending,
     depthWrite: false,
     side: THREE.DoubleSide,
@@ -163,8 +163,9 @@ export function createSkidBuffer(scene, capSegments = 400) {
         const w1 = tailWidth + (seg.headHalfWidth - tailWidth) * Math.pow(t1, 9.5);
         const i = s * 12;
         const c = new THREE.Color(seg.color);
-        const startGlow = 0.16 + 0.84 * Math.pow(t0, 3.2);
-        const endGlow = 0.16 + 0.84 * Math.pow(t1, 3.2);
+        // 검은 타이어 마크 — 균등한 색 (글로우/페이드 그라데이션 ❌).
+        const startGlow = 1.0;
+        const endGlow   = 1.0;
 
         positions[i+0] = seg.ax + nx * w0; positions[i+1] = 0.86; positions[i+2] = seg.az + nz * w0;
         positions[i+3] = seg.ax - nx * w0; positions[i+4] = 0.86; positions[i+5] = seg.az - nz * w0;

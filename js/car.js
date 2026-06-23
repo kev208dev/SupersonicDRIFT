@@ -152,7 +152,7 @@ export function updateCar3D(mesh3d, car, input, track = null, dt = 1 / 60) {
   while (visualDelta > Math.PI) visualDelta -= Math.PI * 2;
   while (visualDelta < -Math.PI) visualDelta += Math.PI * 2;
   if (Math.abs(visualDelta) > Math.PI * 0.72) mesh3d._visualAngle = car.angle;
-  else mesh3d._visualAngle += visualDelta * 0.38;
+  else mesh3d._visualAngle += visualDelta * (KC.VISUAL_YAW_LERP ?? 0.22);
   mesh3d.rotation.y = mesh3d._visualAngle;
 
   const speedSign = Math.sign(car.vx * Math.cos(car.angle) + car.vy * Math.sin(car.angle)) || 1;
@@ -255,8 +255,9 @@ export function updateCar3D(mesh3d, car, input, track = null, dt = 1 / 60) {
     const driftLean    = car._kartRoll;
     const wallRideLean = car.wallRiding ? (car.wallRideSide || Math.sign(car.sideSpeed || 1)) * 0.075 : 0;
     const targetRoll = (rAvg2 - lAvg) * 0.02 + driftLean + wallRideLean + steerRoll;
-    mesh3d.body.rotation.z += (targetPitch - mesh3d.body.rotation.z) * 0.20;
-    mesh3d.body.rotation.x += (targetRoll - mesh3d.body.rotation.x) * 0.20;
+    const leanLerp = KC.LEAN_DAMPING ?? 0.12;
+    mesh3d.body.rotation.z += (targetPitch - mesh3d.body.rotation.z) * leanLerp;
+    mesh3d.body.rotation.x += (targetRoll - mesh3d.body.rotation.x) * leanLerp;
     // 코스메틱 롤/피치 ±5° 하드 클램프 — 차체 굴러 눕는 것 금지.
     const TILT_MAX = 5 * Math.PI / 180;
     if (mesh3d.body.rotation.x > TILT_MAX) mesh3d.body.rotation.x = TILT_MAX;

@@ -15,17 +15,19 @@
 export const KART_TUNING = {
   // ── 그립 (횡속 유지율 / 60fps 프레임) ──────────────────────
   // drift 전환 = 즉시 (수식 드롭). μ는 normal→drift = 약 30% 수준으로 표현.
-  GRIP_DRIFT:       0.982, // 0.993→0.982 — 길게 안 미끄러짐 (벽 박음 방지)
-  DRIFT_SIDE_GRIP:  0.982,
+  GRIP_DRIFT:       0.965, // 0.982→0.965 — 횡그립 강화 (꽉 물고 돔)
+  DRIFT_SIDE_GRIP:  0.965,
   GRIP_NORMAL:      0.40,  // 0.55→0.40 — 평소 노면 꽉 물게 (떠다님 ❌)
   ROLL_FWD:         0.998,   // 0.995→0.998 — passive 전진 감쇠 줄임 (속도 유지)
 
   // ── 속도 티어 (km/h) ───────────────────────────────────────
-  // 속도 하향 (확대 맵 컨트롤 — 35~40% cut). 미세조정 가능 상수.
-  CRUISE_MUL:  1.10,    // 0.85→1.10: cruise = 180 × 1.10 = 198 km/h
-  V_BOOST_MUL: 1.30,    // boost cap = 198 × 1.30 = 257 km/h
-  ACCEL_BASE:  150,
-  BRAKE_RATE:  205,
+  // 속도 캡 — MAX_SPEED / BOOST_MAX_SPEED 가 우선. 없으면 maxSpeed × MUL 로 fallback.
+  MAX_SPEED:        200,    // km/h — 일반 주행 캡
+  BOOST_MAX_SPEED:  300,    // km/h — 부스트 캡 (MAX 초과 가능)
+  CRUISE_MUL:  1.10,        // legacy fallback
+  V_BOOST_MUL: 1.30,        // legacy fallback
+  ACCEL_BASE:  240,         // 150→240 — 빠른 가속 (속도감)
+  BRAKE_RATE:  220,
   REVERSE_TOP: 80,
 
   // ── 드리프트 회전 ──────────────────────────────────────────
@@ -50,6 +52,7 @@ export const KART_TUNING = {
 
   // ── 드리프트 판정 (β 임계값) ───────────────────────────────
   DRIFT_MIN_HOLD:     0.15,          // s — 진입 직후 그레이스 (즉시 release 방지)
+  DRIFT_GRACE_TIME:   0.22,          // s — 드리프트 키 떼도 이 시간 안에 재탭하면 드리프트 이어감 (톡톡이)
   DRIFT_MIN_BETA:     8 * Math.PI / 180,  // 8° — 이 이상이면 IsDrifting 유지
   DRIFT_RELEASE_BETA: 3 * Math.PI / 180,  // 3° — 이 이하로 떨어지면 자동 release
   DRIFT_SPIN_BETA:    88 * Math.PI / 180, // 88° — 이 이상이면 스핀오프 (속도 증발)
@@ -73,8 +76,15 @@ export const KART_TUNING = {
   COUNTER_STEER_THRESHOLD: 0.18,     // 0.3→0.18 — 살짝만 꺾어도 카운터 인정
   ALIGNMENT_GAIN:    3.5,            // legacy
   COUNTER_STEER_RECOVERY_RATE: 9.0,  // /s — 카운터로 펴지는 속도 (heading→velocity 빠른 정렬)
-  DRIFT_ARC_GRIP:    0.30,           // 안쪽 hold 시 heading_follow 강화 → 코너 호 따라 돔 (벽 흘러감 방지)
-  AUTO_RECOVER_RATE: 1.2,            // /s — 카운터 안 할 때 미세 자동 펴짐 (천천히만)
+  DRIFT_ARC_GRIP:    0.50,           // 0.30→0.50 — 안쪽 hold 시 라인 더 잘 잡힘
+  AUTO_RECOVER_RATE: 1.2,            // /s — 카운터 안 할 때 미세 자동 펴짐 (천천히만, 무입력 시엔 IDLE_SLIP_DECAY가 우선)
+  // ── 무입력 슬립 동결 ──
+  // 좌/우 무입력 시 슬립각 패시브 감쇠율 (per-sec exp). 0 = 완전 동결, 회복은 오직 카운터로만.
+  IDLE_SLIP_DECAY:   0.0,            // /s — 0이면 vL pow 마찰 skip → 슬립 그대로 유지
+  IDLE_STEER_DEAD:   0.05,           // |steer| < 이 값이면 '무입력' 판정
+  YAW_DAMPING:       0.35,           // 임계감쇠 — 슬립 천장 부근 yaw 진동 억제
+  MAX_YAW_ACCEL:     8.0,            // rad/s² — yaw rate 변화 상한 (휙 급변 방지, 자국 부드러운 곡선)
+  YAW_RATE_SMOOTH:   3.5,            // /s — yaw rate smoothing (이전 DRIFT_YAW_SMOOTH 6→3.5)
 
   // ── 드리프트 회복 (CM 활주 + 차체 1회 회전, yaw·속도 디커플) ──
   // 종료 시 velocity 스냅 ❌. 관성 그대로 두고 heading만 진행방향으로 회전.
@@ -110,9 +120,9 @@ export const KART_TUNING = {
   GAUGE_W_TRACK:       0.45,         // 트랙 기본 W 계수
   IDLE_CHARGE_RATE:    4,            // /s — 일반 주행 中 작은 충전
   IDLE_CHARGE_MIN_VF:  30,           // 이 vF 이상이어야 idle charge
-  BOOST_INSTANT_DV:    32,           // 55→32 — 부스트 즉발 임펄스 (km/h)
-  BOOST_SUSTAIN_TIME:  1.4,          // s
-  BOOST_SUSTAIN_ACCEL: 55,           // 90→55 — 부스트 sustain 가속 (km/h/s)
+  BOOST_INSTANT_DV:    65,           // 32→65 — 부스트 즉발 임펄스 (확 튀어나감)
+  BOOST_SUSTAIN_TIME:  1.6,          // 1.4→1.6 — 더 길게
+  BOOST_SUSTAIN_ACCEL: 130,          // 55→130 — 부스트 가속 강하게
   BOOST_CAP_DECAY:     0.6,          // s
 
   // ── 빙판 ──────────────────────────────────────────────────
@@ -152,10 +162,14 @@ export const KART_CAMERA = {
   CAM_DIST_SPEED_ADD: 4,    // 10→4 — 고속에서도 거의 안 멀어짐
 
   // ── FOV 속도 비례 ──
-  FOV_BASE:        64,    // 72→64 (정지 시 기본)
-  FOV_MAX:         88,    // 90→88 (최고속도 시)
+  FOV_BASE:        62,    // 정지
+  FOV_MAX:         100,   // 88→100 — 고속 FOV 펀치 강화
   FOV_LERP:        0.08,    // 부드러움 계수 (60fps 기준, dt 보정됨)
-  FOV_BOOST_BUMP:  6,       // boost 中 추가 FOV
+  FOV_BOOST_BUMP:  12,      // 6→12 boost FOV 추가
+
+  // ── 차체 lean/visual 임계감쇠 ──
+  LEAN_DAMPING:    0.12,   // body.rotation.x/z lerp (낮을수록 진동 적고 부드러움)
+  VISUAL_YAW_LERP: 0.22,   // 차 mesh yaw 따라감 (이전 0.38, 진동 ↓)
 
   // ── 드리프트 카메라 (yaw 오프셋 — 기존 유지) ──
   CAM_DIST_PULL:   0.17,
@@ -167,7 +181,7 @@ export const KART_CAMERA = {
   DRIFT_YAW_SMOOTH: 6.0,
   CAM_YAW_FOLLOW:  0.0,                  // (legacy) 카메라는 velocity만 추적 — heading 0%.
   BODY_ROLL_DRIFT: 0.080,    // (legacy, 사용 안 함 — KART_ROLL_MAX로 교체)
-  SPEEDLINE_KMH:   200,
+  SPEEDLINE_KMH:   120,   // 200→120 — 속도선 일찍 시작
   SPEEDLINE_RANGE: 160,
 
   // ── 드리프트 차체 롤 + 카메라 뱅크 ──
@@ -187,7 +201,7 @@ export const KART_CAMERA = {
   // ── 부스트 발동 펀치 (FOV kick / speedline / flame) ──
   // 발동 순간 FOV가 +KICK으로 즉시 가산, 매 프레임 SUSTAIN(boost中)/0(끝)으로
   // 감쇠. 체이닝 시 첫 kick만 큼, 지속 베이스 SUSTAIN 유지.
-  BOOST_FOV_KICK:        14,     // deg — PC 원작 발동 펀치 +14°
+  BOOST_FOV_KICK:        22,     // 14→22 — 발동 순간 FOV 펀치 강화
   BOOST_FOV_SUSTAIN:     5,      // deg — 지속 中 베이스
   BOOST_FOV_DECAY:       6.0,    // /s
   BOOST_SHAKE_AMP:       8,
@@ -202,7 +216,7 @@ export const KART_CAMERA = {
   FX_BOOST:       true,
 
   // 1) 고속 바람저항
-  WIND_SPEED_MIN:    180,        // km/h — 180부터 활성 (사용자 spec)
+  WIND_SPEED_MIN:    130,        // 180→130 — 바람 와류 일찍 활성
   WIND_FOV_ADD:      5,
   WINDLINE_MAX:      1.0,
   RADIALBLUR_MAX:    0.0,
@@ -224,6 +238,7 @@ export const KART_CAMERA = {
   BRAKE_SMOKE_RATE:     14,      // /s — 브레이크 연기 spawn
 
   // 3) 드리프트 트레일 — 색은 gauge로 보간
+  SKID_MARK_COLOR:   0x141414,   // 검은 고무 타이어 자국 (드리프트)
   TRAIL_COLOR_LOW:   0xfff099,   // 진입 초반: 옅은 노랑
   TRAIL_COLOR_HIGH:  0x6688ff,   // 게이지 만점: 파랑/보라
 

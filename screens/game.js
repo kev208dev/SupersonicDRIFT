@@ -28,6 +28,7 @@ import { initMiniMap, updateMiniMap, hideMiniMap } from '../js/minimap.js';
 import { startRecordLineCapture, captureRecordLineSample, loadBestRecordLine, renderRecordLine } from '../js/ghost.js';
 import { updateMissionProgress } from '../js/missions.js';
 import { getSharedRenderer } from '../js/renderer.js';
+import { showRaceCountdown, updateRaceCountdown, hideRaceCountdown } from '../js/effects/raceCountdown.js';
 
 // ── Three.js renderer (persists across retries) ──────────────
 let renderer = null;
@@ -221,11 +222,13 @@ export function initGame(cd, tr, resultsCb, menuCb, options = {}) {
   }
 
   startEngine();
+  showRaceCountdown();
 }
 
 export function stopGame() {
   running = false;
   hideMiniMap();
+  hideRaceCountdown();
   if (resultsTimeout) {
     clearTimeout(resultsTimeout);
     resultsTimeout = null;
@@ -257,6 +260,7 @@ export function updateGame(dt, now) {
   startCountdown = Math.max(0, (startReadyAt - now) / 1000);
   const wasReleased = raceReleased;
   raceReleased = startCountdown <= 0;
+  if (!wasReleased) updateRaceCountdown(startCountdown);
 
   // 출발부스터: raw input 사용 (gating 전). GO 전환 시 1회 fire.
   tickStartBoost(car, input, startCountdown, raceReleased);
@@ -507,7 +511,7 @@ function _emitDriftFx(dt, driveInput) {
     if (prev) {
       const dx = wx - prev.x, dz = w3z - prev.z;
       if (dx*dx + dz*dz > 4.0) {
-        skidBuf.appendTrail(prev.x, prev.z, wx, w3z, 0.65, _driftTrailColor());
+        skidBuf.appendTrail(prev.x, prev.z, wx, w3z, 0.45, _driftTrailColor());
         car[key] = { x: wx, z: w3z };
       }
     } else {
@@ -517,18 +521,8 @@ function _emitDriftFx(dt, driveInput) {
 }
 
 function _driftTrailColor() {
-  // PC 카트라이더식: 게이지 진행도 따라 옅은 노랑→파랑/보라.
-  const meter = Math.max(0, Math.min(100, car?.boostMeter || 0));
-  const stock = Math.max(0, Math.min(2, car?.boostStock || 0));
-  const t = Math.min(1, (stock * 100 + meter) / 200);
-  const lo = KART_CAMERA.TRAIL_COLOR_LOW ?? 0xfff099;
-  const hi = KART_CAMERA.TRAIL_COLOR_HIGH ?? 0x6688ff;
-  const ar = (lo >> 16) & 0xff, ag = (lo >> 8) & 0xff, ab = lo & 0xff;
-  const br = (hi >> 16) & 0xff, bg = (hi >> 8) & 0xff, bb = hi & 0xff;
-  const r = Math.round(ar + (br - ar) * t);
-  const g = Math.round(ag + (bg - ag) * t);
-  const bl = Math.round(ab + (bb - ab) * t);
-  return (r << 16) | (g << 8) | bl;
+  // 검은 고무 타이어 자국. 발광/컬러 ❌.
+  return KART_CAMERA.SKID_MARK_COLOR ?? 0x141414;
 }
 
 function _scheduleResults(ev) {
@@ -564,6 +558,7 @@ export function showStartLights() {
   _prevLitCount = 0;
   _prevBoosting = false;
   _prevDrsActive = false;
+  showRaceCountdown();
 }
 
 export function lockRaceInput() {
@@ -710,7 +705,7 @@ function _renderHUD(dt, kmh) {
   drawSpeedLines(hudCtx, speedLines, kmh, hudCanvas.width, hudCanvas.height, dt, cameraMode, boostT);
   drawHUD(hudCtx, car, timing, hudCanvas.width, hudCanvas.height, track, bestGhost);
   if (lapBannerTimer > 0) _drawLapBanner(hudCtx, hudCanvas.width, hudCanvas.height);
-  if (!raceReleased) _drawStartSignal(hudCtx, hudCanvas.width, hudCanvas.height);
+  // 출발 신호 → MagicRings 오버레이 (js/effects/raceCountdown.js)에서 처리.
 }
 
 function _sampleLapPath(now) {
@@ -724,86 +719,6 @@ function _sampleLapPath(now) {
   if (lapPath.length > 900) lapPath.shift();
 }
 
-function _drawStartSignal(ctx, w, h) {
-  const left = startCountdown;
-  const lit = left > 2.2 ? 1 : left > 1.2 ? 2 : left > 0.25 ? 3 : 4;
-  ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.38)';
-  ctx.fillRect(0, 0, w, h);
-  const cx = w / 2;
-  const y = h * 0.23;
-  ctx.fillStyle = 'rgba(8,12,18,0.92)';
-  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-  ctx.lineWidth = 3;
-  _roundRect(ctx, cx - 170, y - 42, 340, 84, 18);
-  ctx.fill();
-  ctx.stroke();
-  for (let i = 0; i < 4; i++) {
-    const x = cx - 112 + i * 74;
-    const go = lit >= 4;
-    const active = go ? i === 3 : i < lit;
-    const color = go ? '#2ec4b6' : '#e63946';
-    ctx.beginPath();
-    ctx.arc(x, y, 24, 0, Math.PI * 2);
-    ctx.fillStyle = active ? color : '#272d36';
-    ctx.shadowColor = active ? color : 'transparent';
-    ctx.shadowBlur = active ? 18 : 0;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-    ctx.stroke();
-  }
-  ctx.textAlign = 'center';
-  ctx.font = '800 20px system-ui';
-  ctx.fillStyle = 'rgba(255,255,255,0.82)';
-  ctx.fillText(lit >= 4 ? 'GO!' : '출발 신호 대기', cx, y + 62);
-  _drawFlagMarshal(ctx, 90, h * 0.38, performance.now());
-  _drawFlagMarshal(ctx, w - 90, h * 0.38, performance.now() + 800, true);
-  ctx.restore();
-}
-
-function _drawFlagMarshal(ctx, x, y, t, flip = false) {
-  ctx.save();
-  ctx.translate(x, y);
-  if (flip) ctx.scale(-1, 1);
-  const wave = Math.sin(t * 0.012) * 0.45;
-  ctx.strokeStyle = '#f5f5f5';
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(0, 12);
-  ctx.lineTo(24, -24);
-  ctx.stroke();
-  ctx.save();
-  ctx.translate(24, -24);
-  ctx.rotate(wave);
-  for (let i = 0; i < 4; i++) {
-    for (let j = 0; j < 3; j++) {
-      ctx.fillStyle = (i + j) % 2 ? '#111' : '#fff';
-      ctx.fillRect(i * 10, j * 8, 10, 8);
-    }
-  }
-  ctx.restore();
-  ctx.fillStyle = '#101820';
-  ctx.beginPath();
-  ctx.arc(0, -8, 10, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillRect(-9, 2, 18, 36);
-  ctx.restore();
-}
-
-function _roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-}
-
 function _drawLapBanner(ctx, w, h) {
   const cx = w / 2;
   const cy = h * 0.35;
@@ -815,12 +730,12 @@ function _drawLapBanner(ctx, w, h) {
   ctx.lineWidth = 4;
   ctx.strokeRect(0, cy - 70, w, 150);
   // sub label
-  ctx.font = 'bold 20px monospace';
+  ctx.font = "bold 20px 'IBM Plex Mono', monospace";
   ctx.fillStyle = lapBannerNew ? '#ff66ff' : '#ffd23c';
   ctx.textAlign = 'center';
   ctx.fillText(lapBannerSub, cx, cy - 30);
   // big time
-  ctx.font = 'bold 84px monospace';
+  ctx.font = "bold 84px 'IBM Plex Mono', monospace";
   ctx.fillStyle = '#fff';
   ctx.fillText(lapBannerText, cx, cy + 40);
   ctx.restore();

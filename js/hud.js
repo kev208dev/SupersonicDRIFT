@@ -34,13 +34,13 @@ export function drawHUD(ctx, car, timing, canvasW, canvasH, track, ghost = null)
   // ─── 랩 타이머 (상단 중앙) ──
   if (timing?.started && timing?.lapStart != null) {
     const elapsed = performance.now() - timing.lapStart;
-    ctx.font = 'bold 28px monospace';
+    ctx.font = "bold 28px 'IBM Plex Mono', monospace";
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
     ctx.textAlign = 'center';
     ctx.fillText(formatTime(elapsed), canvasW / 2, 38);
   }
   if (track?.name) {
-    ctx.font = 'bold 14px system-ui';
+    ctx.font = "bold 14px 'Chakra Petch', system-ui";
     ctx.fillStyle = 'rgba(255,255,255,0.65)';
     ctx.textAlign = 'center';
     ctx.fillText(track.name, canvasW / 2, 60);
@@ -51,7 +51,7 @@ export function drawHUD(ctx, car, timing, canvasW, canvasH, track, ghost = null)
 
   // top-left hint (before first lap start)
   if (!timing?.started) {
-    ctx.font = '13px monospace';
+    ctx.font = "13px 'IBM Plex Mono', monospace";
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.textAlign = 'left';
     ctx.fillText('W/A/S/D 로 주행 — 출발선 통과 시 랩 시작', 10, 24);
@@ -75,7 +75,7 @@ function _drawSlipBadge(ctx, car) {
   const beta = Math.abs(car.slipBeta || 0) * 180 / Math.PI;
   const drift = !!car.drifting;
   ctx.save();
-  ctx.font = 'bold 13px monospace';
+  ctx.font = "bold 13px 'IBM Plex Mono', monospace";
   ctx.textAlign = 'left';
   ctx.fillStyle = drift ? '#ffd166' : 'rgba(255,255,255,0.55)';
   ctx.fillText(`SLIP ${beta.toFixed(1)}°${drift ? ' *' : ''}`, 12, 80);
@@ -104,13 +104,13 @@ function _drawKartDebug(ctx, car) {
   const driftTime = car.driftTime || 0;
   const surface = car.surface || 'asphalt';
 
-  ctx.font = 'bold 11px monospace';
+  ctx.font = "bold 11px 'IBM Plex Mono', monospace";
   ctx.textAlign = 'left';
   ctx.fillStyle = '#FFD400';
   ctx.fillText(`STATE: ${stateLabel}${reason}`, x + 8, y + 18);
 
   ctx.fillStyle = '#fff';
-  ctx.font = '11px monospace';
+  ctx.font = "11px 'IBM Plex Mono', monospace";
   // ── 차량동역학 / 6단계 분류 ──
   const phase = car.phase || 'STRAIGHT';
   const phaseT = car.phaseTime || 0;
@@ -290,12 +290,12 @@ function _boostUnified(ctx, car, canvasW, canvasH) {
   const y = canvasH - 56;
 
   // 라벨 + SPACE 힌트
-  ctx.font = 'bold 11px system-ui';
+  ctx.font = "bold 11px 'Chakra Petch', system-ui";
   ctx.textAlign = 'center';
   ctx.fillStyle = atMax ? '#67e480' : 'rgba(255,255,255,0.62)';
   ctx.fillText(atMax ? 'BOOSTER  FULL' : 'BOOSTER', canvasW / 2, y - 8);
   if (stock > 0 && !car.boosting) {
-    ctx.font = 'bold 11px monospace';
+    ctx.font = "bold 11px 'IBM Plex Mono', monospace";
     ctx.fillStyle = '#FFD400';
     ctx.textAlign = 'right';
     ctx.fillText('SPACE', x + totalW, y - 8);
@@ -320,7 +320,7 @@ function _boostUnified(ctx, car, canvasW, canvasH) {
       ctx.restore();
       // 화살표
       ctx.fillStyle = '#1a1300';
-      ctx.font = 'bold 18px monospace';
+      ctx.font = "bold 18px 'IBM Plex Mono', monospace";
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('▶', cx + cellW / 2, y + cellH / 2 + 1);
@@ -349,11 +349,11 @@ function _boostUnified(ctx, car, canvasW, canvasH) {
 // ─── 작은 속도 표시 (부스터 위) ───
 function _miniSpeed(ctx, kmh, canvasW, canvasH) {
   const y = canvasH - 84;
-  ctx.font = 'bold 28px monospace';
+  ctx.font = "bold 28px 'IBM Plex Mono', monospace";
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.92)';
   ctx.fillText(`${Math.round(kmh)}`, canvasW / 2, y);
-  ctx.font = 'bold 10px system-ui';
+  ctx.font = "bold 10px 'Chakra Petch', system-ui";
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.fillText('km/h', canvasW / 2, y + 12);
 }
@@ -361,7 +361,7 @@ function _miniSpeed(ctx, kmh, canvasW, canvasH) {
 // ─── 상태 라벨 ───
 function _statusLabel(ctx, car, canvasW, canvasH) {
   const y = canvasH - 108;
-  ctx.font = 'bold 13px monospace';
+  ctx.font = "bold 13px 'IBM Plex Mono', monospace";
   ctx.textAlign = 'center';
   if (car.offTrack) {
     ctx.fillStyle = '#FF453A';
@@ -384,17 +384,17 @@ function _lapsRightBottom(ctx, timing, canvasW, canvasH) {
   const y = canvasH - 72;
   ctx.textAlign = 'left';
 
-  ctx.font = '11px monospace';
+  ctx.font = "11px 'IBM Plex Mono', monospace";
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.fillText('LAST', x, y);
-  ctx.font = 'bold 18px monospace';
+  ctx.font = "bold 18px 'IBM Plex Mono', monospace";
   ctx.fillStyle = '#fff';
   ctx.fillText(timing?.currentLap ? formatTime(timing.currentLap) : '--:--.---', x, y + 20);
 
-  ctx.font = '11px monospace';
+  ctx.font = "11px 'IBM Plex Mono', monospace";
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.fillText('BEST', x + 120, y);
-  ctx.font = 'bold 16px monospace';
+  ctx.font = "bold 16px 'IBM Plex Mono', monospace";
   ctx.fillStyle = '#A8A8A3';
   ctx.fillText(timing?.bestLap ? formatTime(timing.bestLap) : '--:--.---', x + 120, y + 20);
 
@@ -413,7 +413,7 @@ function _sectors(ctx, timing, x, y, canvasW) {
     if (t !== null) {
       color = (best && t <= best) ? '#FFD400' : '#A8A8A3';
     }
-    ctx.font = '11px monospace';
+    ctx.font = "11px 'IBM Plex Mono', monospace";
     ctx.fillStyle = color;
     ctx.textAlign = 'left';
     ctx.fillText(`${labels[i]} ${t !== null ? formatTime(t) : '--:--.---'}`, x + dx, y);

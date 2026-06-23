@@ -75,7 +75,7 @@ export function initResults(data, car, track, raceOptions = {}, retryCb, menuCb)
     menuBtn.textContent = mode === 'friendly' ? '방으로 돌아가기' : '메인 메뉴';
     menuBtn.onclick = () => { cleanupLeaderboard(); menuCb?.(); };
   }
-  if (leaderboardBtn) leaderboardBtn.onclick = () => document.getElementById('btn-open-leaderboard')?.click();
+  if (leaderboardBtn) leaderboardBtn.onclick = () => window.openLeaderboardOverlay?.();
   if (submitBtn) {
     submitBtn.hidden = true; // 자동 저장되므로 숨김
     submitBtn.onclick = () => submitCurrentResult({ submitBtn, statusEl, listEl, mode });

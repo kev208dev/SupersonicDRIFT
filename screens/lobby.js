@@ -3,6 +3,7 @@ import { CAR_DATA } from '../data/cars.js';
 import { MpClient } from '../js/net/mpClient.js';
 import { getDisplayProfile } from '../utils/profile.js';
 import { getUserProfile, openProfileEditor, renderProfileCard } from '../utils/userProfile.js';
+import { showMatchmaking, updateMatchmaking, hideMatchmaking } from '../js/menu/matchmakingScreen.js';
 
 const QUICK_TAB = 'quick';
 const PRIVATE_TAB = 'private';
@@ -157,6 +158,7 @@ function _ensureSocket() {
     const track = TRACKS.find(t => t.id === currentRoom.trackId);
     if (!track) return;
     const car = selectedCar || CAR_DATA[0];
+    hideMatchmaking();
     if (onStartRace) onStartRace(car, track, currentRoom, net, msg.startAt, myClientId);
   }));
   if (shouldConnect) net.connect({ ...identity, profile: getUserProfile() });
@@ -326,13 +328,30 @@ function _renderRoom(room) {
 
 function _renderQueueStatus(state) {
   const el = document.getElementById('lobby-queue-status');
-  if (!el) return;
-  if (!state) {
-    el.textContent = '대기 인원: -';
-    return;
+  if (el) {
+    if (!state) {
+      el.textContent = '대기 인원: -';
+    } else {
+      const seconds = Math.max(0, Math.ceil(state.etaMs / 1000));
+      el.textContent = `매칭 중 · ${state.count}/${state.target}명 · ${seconds}초 후 자동 시작`;
+    }
   }
-  const seconds = Math.max(0, Math.ceil(state.etaMs / 1000));
-  el.textContent = `매칭 중 · ${state.count}/${state.target}명 · ${seconds}초 후 자동 시작`;
+  // 풀스크린 MagicRings 오버레이 — 매칭 active 시.
+  if (state) {
+    const seconds = Math.max(0, Math.ceil(state.etaMs / 1000));
+    const sub = `${state.count}/${state.target} RACERS · ${seconds}s TO LAUNCH`;
+    showMatchmaking({
+      title: 'FINDING RACERS',
+      sub,
+      cancelable: true,
+      onCancel: () => {
+        try { net?.send({ t: 'leaveQueue' }); } catch {}
+      },
+    });
+    updateMatchmaking(sub);
+  } else {
+    hideMatchmaking();
+  }
 }
 
 export function renderLobbyMapPreview(room) {
