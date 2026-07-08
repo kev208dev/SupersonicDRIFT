@@ -1,5 +1,5 @@
 // MagicRings — 바닐라 JS 포팅 (원본: React Bits MagicRings).
-// React 불필요. 기존 Three.js 사용. NEON APEX 카운트다운 링 연출용.
+// React 불필요. 기존 Three.js 사용. SUPERSONIC DRIFT 카운트다운 링 연출용.
 // 셰이더는 원본과 100% 동일 — 네가 튜닝한 룩 그대로 나옴.
 import * as THREE from 'three';
 

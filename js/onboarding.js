@@ -11,7 +11,7 @@ export function renderOnboarding() {
   el.className = 'onboarding-overlay';
   el.innerHTML = `
     <div class="onboarding-card">
-      <h2>Welcome to NEON APEX</h2>
+      <h2>Welcome to SUPERSONIC DRIFT</h2>
       <ol>
         <li><b>Steer</b><span>Use joystick or A/D.</span></li>
         <li><b>Drift</b><span>Hold Drift or Space/Enter through corners.</span></li>

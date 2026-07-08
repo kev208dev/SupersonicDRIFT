@@ -889,7 +889,7 @@ select:focus-visible {
   background: linear-gradient(90deg, #ffd400, #ff8a00);
   box-shadow: 0 0 8px rgba(255,212,0,0.85), 0 0 16px rgba(255,138,0,0.5);
 }
-/* NEON APEX — title + accent glow */
+/* SUPERSONIC DRIFT — title + accent glow */
 .lobby-topbar h1 {
   font-family: 'Orbitron', 'Chakra Petch', sans-serif !important;
   text-shadow: 0 0 12px rgba(46,230,255,0.55), 0 0 26px rgba(177,75,255,0.4);
@@ -4288,6 +4288,56 @@ select:focus-visible {
   pointer-events: none;
 }
 
+/* center column: F1 lights row above 3/2/1 text */
+#race-countdown-root .rc-center {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(18px, 3vmin, 36px);
+  pointer-events: none;
+}
+
+/* F1-style 5-light ladder */
+#race-countdown-root .rc-lights {
+  display: flex;
+  gap: clamp(12px, 2.2vmin, 28px);
+  padding: clamp(10px, 1.6vmin, 18px) clamp(18px, 2.6vmin, 32px);
+  background: rgba(8, 8, 10, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  box-shadow: 0 0 30px rgba(0,0,0,0.6), inset 0 0 22px rgba(0,0,0,0.65);
+}
+#race-countdown-root .rc-light {
+  width: clamp(28px, 4.4vmin, 56px);
+  height: clamp(28px, 4.4vmin, 56px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #2a0808 0%, #120303 65%, #050101 100%);
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.85), inset 0 0 14px rgba(255,0,0,0.05);
+  transition: background 90ms ease-out, box-shadow 90ms ease-out;
+}
+#race-countdown-root .rc-light.rc-light-on {
+  background: radial-gradient(circle at 35% 30%, #ff8888 0%, #ff1a1a 45%, #6a0202 100%);
+  box-shadow:
+    0 0 18px rgba(255, 40, 30, 0.95),
+    0 0 42px rgba(255, 60, 20, 0.7),
+    inset 0 0 8px rgba(255, 200, 180, 0.6);
+}
+#race-countdown-root .rc-light.rc-light-go {
+  background: radial-gradient(circle at 35% 30%, #d6ffd0 0%, #2dff70 45%, #0a5d28 100%);
+  box-shadow:
+    0 0 26px rgba(45, 255, 112, 0.95),
+    0 0 60px rgba(45, 255, 112, 0.65),
+    inset 0 0 8px rgba(220, 255, 220, 0.6);
+  animation: rcGoLightPulse 700ms ease-out both;
+}
+@keyframes rcGoLightPulse {
+  0%   { transform: scale(0.6); opacity: 0; }
+  35%  { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1.0); opacity: 1; }
+}
+
 /* 두 slot stacked → 크로스페이드 (텍스트 교체 시 끊김 없음) */
 #race-countdown-root .rc-stack {
   position: relative;
@@ -4314,12 +4364,12 @@ select:focus-visible {
   will-change: transform, opacity, filter, letter-spacing;
 }
 #race-countdown-root .rc-slot.rc-variant-go {
-  font-size: clamp(80px, 14vw, 220px);
-  color: #FFD400;
+  font-size: clamp(120px, 22vw, 360px);
+  color: #d6ffd0;
   text-shadow:
-    0 0 30px rgba(255, 212, 0, 0.95),
-    0 0 80px rgba(255, 86, 48, 0.75),
-    0 0 160px rgba(255, 86, 48, 0.45);
+    0 0 32px rgba(45, 255, 112, 0.95),
+    0 0 80px rgba(45, 255, 112, 0.75),
+    0 0 160px rgba(20, 200, 70, 0.5);
 }
 #race-countdown-root .rc-slot.rc-variant-free {
   font-size: clamp(60px, 10vw, 160px);

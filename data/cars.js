@@ -1,4 +1,4 @@
-// NEON APEX — 5-car roster.
+// SUPERSONIC DRIFT — 5-car roster.
 // Each car has a sharply different stat profile so they actually FEEL distinct:
 // stats {speed, acceleration, grip, handling, boost} drive the physics in carStats.js.
 export const CAR_DATA = [
