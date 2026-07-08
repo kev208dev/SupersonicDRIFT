@@ -3754,6 +3754,61 @@ select:focus-visible {
   font-size: 14px;
 }
 
+/* GARAGE modal — reparents the existing .lobby-car-panel out from under the
+   hidden .main-menu so car selection is reachable from the SD card menu. */
+#sd-garage-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(5, 6, 10, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+#sd-garage-modal.is-open { display: flex; }
+#sd-garage-modal .sd-garage-box {
+  width: min(420px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#sd-garage-modal .sd-garage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+#sd-garage-modal .sd-garage-bar span {
+  font: 900 13px 'IBM Plex Mono', monospace;
+  letter-spacing: .22em;
+  color: #a855ff;
+  text-transform: uppercase;
+}
+#sd-garage-modal .sd-garage-bar button {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(10, 10, 11, 0.78);
+  color: #F4F3F1;
+  font: 700 11px 'IBM Plex Mono', monospace;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+#sd-garage-modal .sd-garage-bar button:hover {
+  border-color: #FF5630;
+  color: #FF5630;
+}
+#sd-garage-modal .lobby-car-panel {
+  grid-column: unset;
+  width: 100%;
+  max-height: min(70vh, 560px);
+}
+
 /* ──────────────────────────────────────────────────────────────
    GLOBAL BUTTON UNIFICATION — SuperSonic Drift aesthetic
    모든 .btn-primary / .btn-secondary / .btn-link / .btn-small / .btn-icon

@@ -118,6 +118,19 @@ export function initSupersonicMenu() {
               </div>
             </div>
           </button>
+          <button class="border-glow-card sd-card" data-action="garage" style="--accent:#a855ff;">
+            <span class="edge-light"></span>
+            <div class="border-glow-inner sd-card-inner">
+              <div class="sd-card-head">
+                <span class="sd-card-kicker">04 / GARAGE</span>
+                <span class="sd-card-arrow">›</span>
+              </div>
+              <div class="sd-card-body">
+                <div class="sd-card-title">CAR SELECT</div>
+                <div class="sd-card-sub">Pick your ride · view stats</div>
+              </div>
+            </div>
+          </button>
         </div>
         <div class="sd-controls-hint">WASD Drive · SHIFT Drift · SPACE Boost · R Respawn · TAB Records</div>
       </div>
@@ -372,9 +385,51 @@ function _wireCards() {
         else document.getElementById('btn-lobby-ranked')?.click();
       }
       else if (act === 'rank')   document.getElementById('btn-main-leaderboard')?.click();
-      else if (act === 'garage') document.getElementById('btn-lobby-ranked')?.click();
+      else if (act === 'garage') _openGarage();
     });
   });
+}
+
+// GARAGE 카드 → 기존 .lobby-car-panel(차량 선택 UI, main.js에서 이미 렌더/wiring 완료)을
+// .main-menu 밖 모달로 재배치(reparent)해서 노출. 클론이 아닌 이동이라 id 기반 리스너 그대로 유지.
+let _garageModal = null;
+let _garagePanelHome = null; // { parent, next } — dispose 시 원위치 복구용
+
+function _ensureGarageModal() {
+  if (_garageModal) return _garageModal;
+  const modal = document.createElement('div');
+  modal.id = 'sd-garage-modal';
+  modal.innerHTML = `
+    <div class="sd-garage-box">
+      <div class="sd-garage-bar">
+        <span>GARAGE</span>
+        <button id="sd-garage-close" type="button">✕ CLOSE</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector('#sd-garage-close').addEventListener('click', _closeGarage);
+  modal.addEventListener('mousedown', (e) => { if (e.target === modal) _closeGarage(); });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('is-open')) _closeGarage();
+  });
+  _garageModal = modal;
+  return modal;
+}
+
+function _openGarage() {
+  const panel = document.querySelector('.lobby-car-panel');
+  if (!panel) return;
+  const modal = _ensureGarageModal();
+  if (!_garagePanelHome) {
+    _garagePanelHome = { parent: panel.parentNode, next: panel.nextSibling };
+  }
+  modal.querySelector('.sd-garage-box').appendChild(panel);
+  modal.classList.add('is-open');
+}
+
+function _closeGarage() {
+  if (_garageModal) _garageModal.classList.remove('is-open');
 }
 
 // 카드별 BorderGlow 색상 — glowColor(HSL) + gradient palette.
@@ -382,8 +437,7 @@ const _CARD_GLOW = {
   play:   { h: 190, s: 100, l: 70, colors: ['#28e0ff', '#7fefff', '#0e5ea5'] },
   ranked: { h: 320, s: 100, l: 72, colors: ['#ff5cc8', '#ff99e0', '#c01985'] },
   rank:   { h:  50, s: 100, l: 65, colors: ['#ffd400', '#ffea66', '#cc9900'] },
-  // legacy alias
-  garage: { h: 320, s: 100, l: 72, colors: ['#ff5cc8', '#ff99e0', '#c01985'] },
+  garage: { h: 270, s: 100, l: 67, colors: ['#a855ff', '#c896ff', '#7a1fd6'] },
 };
 const _GRAD_POS = ['80% 55%', '69% 34%', '8% 6%', '41% 38%', '86% 85%', '82% 18%', '51% 4%'];
 const _GRAD_KEYS = ['--gradient-one','--gradient-two','--gradient-three','--gradient-four','--gradient-five','--gradient-six','--gradient-seven'];
@@ -432,5 +486,12 @@ export function disposeSupersonicMenu() {
   if (_ascii) { _ascii.dispose(); _ascii = null; }
   if (_resizeHandler) { window.removeEventListener('resize', _resizeHandler); _resizeHandler = null; }
   if (_onlineTimer) { clearTimeout(_onlineTimer); _onlineTimer = null; }
+  if (_garagePanelHome) {
+    const panel = document.querySelector('.lobby-car-panel');
+    if (panel) _garagePanelHome.parent.insertBefore(panel, _garagePanelHome.next);
+    _garagePanelHome = null;
+  }
+  _garageModal?.remove();
+  _garageModal = null;
   document.getElementById('sd-root')?.remove();
 }

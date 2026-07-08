@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createCarDesign } from './carDesigns.js';
 import { mapStatToPhysics, normalizeCarStats } from './carStats.js';
 import { getSkinById } from '../data/skins.js';
+import { getKartMesh } from './whiteMesh.js';
 import { KART_CAMERA as KC, KART_PROPORTIONS as KP } from '../kart-boost/config.js';
 
 const CAR_DESIGN_BY_ID = {
@@ -80,13 +81,19 @@ export function createCar(carData, startPos) {
 export function createCar3D(carData = {}) {
   const root = new THREE.Group();
   const designType = carData.designType || CAR_DESIGN_BY_ID[carData.id] || 'formula_red';
-  const model = createCarDesign(designType);
+  // 프리로드된 실사 GLB 카트가 있으면 그걸 우선 사용, 아직 로드 전이면 절차적 모델로 폴백.
+  const glb = getKartMesh(designType);
+  const usingGLB = !!glb;
+  const model = usingGLB ? glb.root : createCarDesign(designType);
   _applySkin(model, carData.skin);
   model.rotation.y = Math.PI / 2;
   // 카트라이더식 박스 비율: Y만 H_MUL로 스트레치. X,Z는 기본 5.2 유지 (휠 좌우/전후 절대치는
   // 휠 position 곱셈으로 처리 — 그래야 차체와 휠이 독립 컨트롤됨).
+  // GLB는 whiteMesh.js에서 이미 최종 스케일로 정규화되어 들어오므로 추가 scale ❌.
   const baseS = 5.2;
-  model.scale.set(baseS, baseS * KP.HEIGHT_MUL, baseS);
+  if (!usingGLB) {
+    model.scale.set(baseS, baseS * KP.HEIGHT_MUL, baseS);
+  }
   root.add(model);
 
   const wheelGroups = [];
