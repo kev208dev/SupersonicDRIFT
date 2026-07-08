@@ -490,7 +490,7 @@ function createCyberBlackCarModel() {
   return car;
 }
 
-// NEON APEX — Photon GT-R: long, low aqua speed wedge with neon underglow.
+// SUPERSONIC DRIFT — Photon GT-R: long, low aqua speed wedge with neon underglow.
 function createNeonAquaCarModel() {
   const m = createCarMaterials();
   const aqua = new THREE.MeshStandardMaterial({ color: 0x0c2f37, roughness: 0.28, metalness: 0.5 });
@@ -516,7 +516,7 @@ function createNeonAquaCarModel() {
   return car;
 }
 
-// NEON APEX — Prism EVO: wide, planted magenta grip machine with a tall wing.
+// SUPERSONIC DRIFT — Prism EVO: wide, planted magenta grip machine with a tall wing.
 function createNeonMagentaCarModel() {
   const m = createCarMaterials();
   const mag = new THREE.MeshStandardMaterial({ color: 0x33102b, roughness: 0.3, metalness: 0.42 });

@@ -86,14 +86,34 @@ export class MagicRings {
 
     let renderer;
     try {
-      renderer = new THREE.WebGLRenderer({ alpha: true });
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        premultipliedAlpha: true,
+        preserveDrawingBuffer: false,
+        antialias: false,
+      });
     } catch {
       console.warn('[MagicRings] WebGL init failed');
       return;
     }
     this.renderer = renderer;
+    renderer.autoClear = true;
     renderer.setClearColor(0x000000, 0);
-    mount.appendChild(renderer.domElement);
+
+    // 기존 magic-rings 캔버스가 같은 mount에 남아있으면 중복 마운트 방지.
+    mount.querySelectorAll('canvas[data-magic-rings="1"]').forEach((c) => c.remove());
+
+    const dom = renderer.domElement;
+    dom.dataset.magicRings = '1';
+    dom.style.display = 'block';
+    dom.style.width = '100%';
+    dom.style.height = '100%';
+    dom.style.opacity = '0';
+    dom.style.transition = 'opacity 300ms ease-out';
+    mount.appendChild(dom);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => { dom.style.opacity = '1'; });
+    });
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 10);
