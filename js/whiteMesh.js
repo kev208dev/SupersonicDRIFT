@@ -1,10 +1,19 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// 두 GLB 카트 — id → 파일.
+// GLB 카트 — id → 파일.
 const KART_URLS = {
   kart_a: 'assets/cars/kart_a.glb',
   kart_b: 'assets/cars/kart_b.glb',
+  kart_c: 'assets/cars/kart_c.glb',
+};
+
+// id → 차체 도장 색. 세 GLB 모두 trimesh로 구운 단일 메시(이름/서브파트 없음)라
+// 부위별 채색이 불가 — 카트별로 다른 색을 줘서 최소한 서로 구분되게 한다.
+const KART_BODY_COLOR = {
+  kart_a: '#FF2A2A', // racing red
+  kart_b: '#2E7BFF', // racing blue
+  kart_c: '#FFC63C', // racing amber
 };
 
 const _loaded = {};    // id → THREE.Group (정규화된 원본)
@@ -21,7 +30,7 @@ function _loadOne(id) {
   _loading[id] = new Promise((resolve, reject) => {
     loader.load(KART_URLS[id], gltf => {
       _loaded[id] = gltf.scene;
-      _normalize(_loaded[id]);
+      _normalize(_loaded[id], id);
       let meshCount = 0;
       _loaded[id].traverse(c => { if (c.isMesh) meshCount++; });
       console.log(`[kart] loaded ${id}: ${meshCount} mesh(es)`);
@@ -47,7 +56,7 @@ export function listKartIds() {
   return Object.keys(KART_URLS);
 }
 
-function _normalize(scene) {
+function _normalize(scene, id) {
   // 모든 변환(최종 스케일 + 바닥/중심 정렬) 한곳에서 마감. car.js는 추가 scale ❌.
   const TARGET_MAX = 18.7;   // 최대축 단위 (예전 3.6 × 5.2와 동일).
   const box0 = new THREE.Box3().setFromObject(scene);
@@ -71,12 +80,13 @@ function _normalize(scene) {
       c.receiveShadow = false;
     }
   });
-  _paintKartParts(scene);
+  _paintKartParts(scene, id);
 }
 
 // GLB 노드 이름 매치 → 차체/바퀴 머티리얼 일괄 교체.
-// body / car → 카트라이더식 빨간 광택.  wheel / tire → 매트 다크그레이.
-function _paintKartParts(scene) {
+// body / car → 카트별 지정 색 광택.  wheel / tire → 매트 다크그레이.
+function _paintKartParts(scene, id) {
+  const bodyColor = KART_BODY_COLOR[id] || '#FF2A2A';
   scene.traverse(child => {
     if (!child.isMesh) return;
     const name = (child.name || '').toLowerCase();
@@ -90,16 +100,16 @@ function _paintKartParts(scene) {
     }
     if (name.includes('body') || name.includes('car') || name.includes('chassis') || name.includes('shell') || name.includes('frame')) {
       child.material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color('#FF2A2A'),
+        color: new THREE.Color(bodyColor),
         metalness: 0.1,
         roughness: 0.18,
       });
       return;
     }
-    // 이름 매치 없음 + 단일 메시 GLB → 기본을 차체로 간주해 빨강 칠.
+    // 이름 매치 없음 + 단일 메시 GLB(3종 모두 해당) → 전체를 차체로 간주해 카트별 색 칠.
     if ((child.material?.color)) {
       const m = new THREE.MeshStandardMaterial({
-        color: new THREE.Color('#FF2A2A'),
+        color: new THREE.Color(bodyColor),
         metalness: 0.1,
         roughness: 0.22,
       });

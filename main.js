@@ -1079,7 +1079,7 @@ _safeInit('globalCompletionToast', _wireGlobalCompletionToast);
 // even if auth/profile init below throws or rejects.
 startGameLoopOnce();
 
-// 두 카트 GLB 사전 로드 (fire-and-forget; 로드 전 createCar3D는 fallback box).
+// 카트 GLB 3종 사전 로드 (fire-and-forget; 로드 전 createCar3D는 fallback box).
 preloadKartMeshes().catch(err => console.warn('[karts] preload failed:', err));
 
 await _safeAsyncInit('auth', initAuth);
